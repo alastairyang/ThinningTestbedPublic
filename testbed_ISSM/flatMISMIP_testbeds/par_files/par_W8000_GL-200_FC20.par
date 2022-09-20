@@ -1,0 +1,133 @@
+Ly = 8000; 
+delta_gl_depth = -200; 
+bg_fric_coef = 20; 
+
+% create a file name identifier
+filenameID = ['_W', num2str(Ly), '_GL', num2str(delta_gl_depth), '_FC', num2str(bg_fric_coef)];
+
+% create an .exp for doamin outline
+disp('      generating the domain outline');
+Lx = 30000; % default lenght is always 30 km
+outline_coor = [0,0; Lx, 0; Lx, Ly; 0, Ly; 0,0];
+fileID = fopen(['exp_files/domain', filenameID, '.exp'],'w');
+fprintf(fileID,'%s\n','## Name:DomainOutline');
+fprintf(fileID,'%s\n','## Icon:0');
+fprintf(fileID,'%s\n','# Points Count  Value');
+fprintf(fileID,'%f %f\n', 5, 1);
+fprintf(fileID,'%s\n','# X pos Y pos');
+fprintf(fileID,'%f %f\n', outline_coor.');
+fclose(fileID);
+
+% create an .exp for ice front
+outline_coor = [Lx-1,Ly-0.01; Lx+1, Ly-0.01; Lx+1, 0+0.01; Lx-1, 0+0.01; Lx-1,Ly-0.01];
+fileID = fopen(['exp_files/front', filenameID, '.exp'],'w');
+fprintf(fileID,'%s\n','## Name:IceFrontOutline');
+fprintf(fileID,'%s\n','## Icon:0');
+fprintf(fileID,'%s\n','# Points Count  Value');
+fprintf(fileID,'%d %.1f\n', 5, 1);
+fprintf(fileID,'%s\n','# X pos Y pos');
+fprintf(fileID,'%d %.2f\n', outline_coor.');
+fclose(fileID);
+
+% create an initail mash
+disp('      creating the model');
+meshsize = 200;
+md = bamg(md,'domain',['exp_files/domain' filenameID '.exp'],'hmax',meshsize,'splitcorners',1);
+md.miscellaneous.name=['MISMIP_' filenameID];
+md=setmask(md,'','');
+
+disp('      creating thickness');
+Lx = max(md.mesh.x); % domain length (along ice flow)
+Ly = max(md.mesh.y); % domain width (across ice flow)
+
+B0   = delta_gl_depth; % 150 + delta_gl_depth; % bedrock topography at x=0
+xbar = 15000; % characteristic along-flow length scale of the bedrock
+bx   = B0*ones(size(md.mesh.x)); %B0 - 728.8.*(md.mesh.x/xbar).^2 + 343.91.*(md.mesh.x/xbar).^4 - 50.57.*(md.mesh.x/xbar).^6;
+
+fc =   400; % 800; % characteristic width of the side walls of the channel
+dc =  1000; % depth of the trough compared with the side walls
+wc =  (2800/4000)*Ly/2; % half-width of the trough
+by = dc ./ (1 + exp(-2/fc .* (md.mesh.y-Ly/2-wc))) + dc ./ (1 + exp(2/fc .* (md.mesh.y-Ly/2+wc)));
+
+zbdeep = -720; % maximum depth of the bedrock topography
+md.geometry.bed=max(bx+by,zbdeep);
+
+by0 = 1200 ./ (1 + exp(-2/fc .* (0-Ly/2-wc))) + 1200 ./ (1 + exp(2/fc .* (0-Ly/2+wc)));
+md.geometry.surface = bx+by0;
+md.geometry.base=md.geometry.bed;
+md.geometry.thickness=md.geometry.surface-md.geometry.base;
+
+disp('      creating drag');
+md.friction.coefficient=sqrt(3.160*10^6)*ones(md.mesh.numberofvertices,1); %q=1.
+md.friction.p=3*ones(md.mesh.numberofelements,1);
+md.friction.q=zeros(md.mesh.numberofelements,1);
+
+md.friction.coefficient = (200 - bg_fric_coef) ./ (1 + exp(-2/fc .* (md.mesh.y-Ly/2-wc))) + (200 - bg_fric_coef) ./ (1 + exp(2/fc .* (md.mesh.y-Ly/2+wc))) + bg_fric_coef;
+md.friction.p=ones(md.mesh.numberofelements,1);
+md.friction.q=ones(md.mesh.numberofelements,1);
+
+disp('      creating flow law paramter');
+md.materials.rheology_B=cuffey(273.15-3)*ones(md.mesh.numberofvertices,1);
+md.materials.rheology_n=3*ones(md.mesh.numberofelements,1);
+md.materials.rheology_law='None';
+
+disp('      boundary conditions for diagnostic model');
+%Create node on boundary fist (because we cannot use mesh)
+md=SetMarineIceSheetBC(md, ['exp_files/front' filenameID '.exp']);
+md.mask.ice_levelset(:)=-1;
+%md.mask.groundedice_levelset(:)=+1; % I commented this out (y.d.), since groundedice_levelset doesn't exist in my ISSM version; it should be ocean-levelset
+md.mask.ocean_levelset(:)=+1; 
+pos=find(md.mesh.x < Lx+0.1 & md.mesh.x > Lx-0.1);
+md.mask.ice_levelset(pos)=0;
+md.stressbalance.spcvx(:)=NaN;
+md.stressbalance.spcvy(:)=NaN;
+pos=find((md.mesh.y < Ly+0.1 & md.mesh.y > Ly-0.1) | (md.mesh.y<0.1 & md.mesh.y>-0.1));
+%md.stressbalance.spcvx(pos)=0;
+md.stressbalance.spcvy(pos)=0;
+%Extra check needed to remove spcvz BCs along the front ... not sure why they're there ... something in SetMarineIceSheetBC
+pos = find(ContourToNodes(md.mesh.x,md.mesh.y,['exp_files/front' filenameID '.exp'],2));
+md.stressbalance.spcvz(pos)=NaN;
+pos=find(md.mesh.x<0.1 & md.mesh.x>-0.1);
+md.stressbalance.spcvy(pos)=0;
+md.stressbalance.spcvx(pos)=0;
+
+% inflow boundary condition
+% fix boundary flow velocity and thickness 
+md.stressbalance.spcvx(pos)=4000; 
+md.stressbalance.spcvx(pos)=-( 700 ./ (1 + exp(-2/fc .* (md.mesh.y(pos)-Ly/2-wc))) + 700 ./ (1 + exp(2/fc .* (md.mesh.y(pos)-Ly/2+wc))) + 10 ) + 700;
+md.masstransport.spcthickness(pos)=md.geometry.thickness(pos); % fix boundary thickness
+
+
+disp('      forcing conditions');
+%md.basalforcings=mismipbasalforcings(md);
+md.basalforcings=basalforcings();
+%md.basalforcings.meltrate_factor=0;
+%md.basalforcings.threshold_thickness=75;
+%md.basalforcings.upperdepth_melt=-100;
+md.smb.mass_balance = 0.0 - (0.5 / (max(md.mesh.x)-min(md.mesh.x)) ) .* md.mesh.x;
+%md.smb.mass_balance = 0.6 * ones(md.mesh.numberofvertices,1);
+%md.basalforcings.geothermalflux=0.5*ones(md.mesh.numberofvertices,1);
+ud.basalforcings.geothermalflux=0.05*ones(md.mesh.numberofvertices,1);
+md.basalforcings.groundedice_melting_rate=0.*ones(md.mesh.numberofvertices,1);
+md.basalforcings.floatingice_melting_rate=0.*ones(md.mesh.numberofvertices,1);
+
+md.thermal.spctemperature=NaN*ones(md.mesh.numberofvertices,1);
+md.groundingline.migration='SubelementMigration';
+
+%Parameters
+md.materials.rho_ice=918;
+md.materials.rho_water=1028;
+md.constants.g=9.8;
+md.constants.yts=31556926;
+md.transient.issmb=0;
+md.transient.isthermal=0;
+md.transient.isgroundingline=1;
+md.stressbalance.isnewton=0;
+
+%Initialization
+md.initialization.vx=ones(md.mesh.numberofvertices,1);
+md.initialization.vy=ones(md.mesh.numberofvertices,1);
+md.initialization.vz=ones(md.mesh.numberofvertices,1);
+md.initialization.vel=sqrt(2)*ones(md.mesh.numberofvertices,1);
+md.initialization.pressure=md.constants.g*md.materials.rho_ice*md.geometry.thickness;
+md.initialization.temperature=273*ones(md.mesh.numberofvertices,1);
