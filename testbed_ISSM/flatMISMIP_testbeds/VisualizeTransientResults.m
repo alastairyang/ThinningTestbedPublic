@@ -1,6 +1,6 @@
 %% parameters
-foldername = 'models_yang_2';
-model_type = 'MISMIP_yangTransient_Steadystate_Extended.mat';
+foldername = 'long_models_yang';
+model_type = 'MISMIP_yangTransient_Remeshexperiment.mat';
 
 %% Visualize the Vx at the last time step
 folder_dir = dir([pwd '/' foldername]);
@@ -27,7 +27,7 @@ end
 %% Visualize an animated map of one specific model
 % Visualize the Vx at the last time step
 folder_dir = dir([pwd '/' foldername]);
-i = 30;
+i = 11;
 
 md = load([folder_dir(i).folder '/' folder_dir(i).name '/' model_type]).md;
 result_num = size(md.results.TransientSolution, 2);
@@ -35,7 +35,7 @@ model_name = folder_dir(i).name(7:end);
 disp(['The model is ' model_name])
 % print result
 for j = 1:result_num
-    plotmodel(md, 'data', md.results.TransientSolution(j).Surface,...
+    plotmodel(md, 'data', md.results.TransientSolution(j).Vel,...
         'title',model_name, 'contourlevels',{0});
     %pause(0.2)
 end
