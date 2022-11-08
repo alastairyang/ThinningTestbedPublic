@@ -70,7 +70,7 @@ function write_par(var_table)
     bg_fric_coef = var_table.('background_friccoef');
 
     par_name = ['par','_W', num2str(Ly), '_GL', num2str(delta_gl_depth), '_FC', num2str(bg_fric_coef)];
-    fid = fopen('par_files/MISMIP_template.par');
+    fid = fopen('long_par_files/MISMIP_template.par');
     % remove the first four lines
     fgetl(fid);
     fgetl(fid);
@@ -80,7 +80,7 @@ function write_par(var_table)
     frest = fread(fid, Inf);
     fclose(fid);
     % destination file
-    fid = fopen(['par_files/', par_name,'.par'], 'w');
+    fid = fopen(['long_par_files/', par_name,'.par'], 'w');
     fprintf(fid, ['Ly = ', num2str(Ly),'; \n']);
     fprintf(fid, ['delta_gl_depth = ', num2str(delta_gl_depth), '; \n']);
     fprintf(fid, ['bg_fric_coef = ', num2str(bg_fric_coef),'; \n']);
