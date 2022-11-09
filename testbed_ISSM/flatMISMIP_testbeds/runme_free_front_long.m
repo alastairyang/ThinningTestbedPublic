@@ -26,7 +26,7 @@ tic
 % start iteration
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
-for jj = 16%md_idx
+for jj = 1%md_idx
 
     var_table = mdvar_combs(jj,:);
 
@@ -47,7 +47,7 @@ for jj = 16%md_idx
     end
 
     % RUN
-    for steps = 5
+    for steps = 6
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -327,6 +327,8 @@ for jj = 16%md_idx
             np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
             cluster = generic('name', oshostname(), 'np', np);
             md.cluster = cluster;
+            % relax max iteration (might need in certain shear margin runs)
+            md.stressbalance.maxiter=100;
 
             %% Calving
             % forcings
@@ -417,7 +419,11 @@ for jj = 16%md_idx
                     md.materials.rheology_B = [md.materials.rheology_B, B];
                     
                     % solve
-                    md = solve(md,'tr');
+                    try
+                        md = solve(md,'tr');
+                    catch
+                        pause
+                    end
     
                     % save the new result to a separate var
                     new_results = [new_results,md.results.TransientSolution(1)];
@@ -455,6 +461,8 @@ for jj = 16%md_idx
             np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
             cluster = generic('name', oshostname(), 'np', np);
             md.cluster = cluster;
+            % relax max iteration (might need in certain shear margin runs)
+            md.stressbalance.maxiter=100;
 
             %% Calving
             % forcings
