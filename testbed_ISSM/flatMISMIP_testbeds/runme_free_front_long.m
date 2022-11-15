@@ -26,7 +26,7 @@ tic
 % start iteration
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
-for jj = 1%md_idx
+for jj = 16%md_idx
 
     var_table = mdvar_combs(jj,:);
 
@@ -47,7 +47,7 @@ for jj = 1%md_idx
     end
 
     % RUN
-    for steps = 6
+    for steps = 7
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -463,6 +463,8 @@ for jj = 1%md_idx
             md.cluster = cluster;
             % relax max iteration (might need in certain shear margin runs)
             md.stressbalance.maxiter=100;
+            % do not interpolate forcing
+            md.timestepping.interp_forcing = 0;
 
             %% Calving
             % forcings
@@ -540,6 +542,10 @@ for jj = 1%md_idx
                     C = C0;
                 else
                     deltaH = results(end).Thickness - H0;
+                    % dh/dt is not zero at "steady state; it's just small
+                    % but we ensure not effect was introduced right away
+                    % by setting a threshhold at 0.3
+                    deltaH(deltaH>-0.3) = 0; 
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, deltaH, k_budd, C0, C, ocean_mask);
