@@ -464,7 +464,70 @@ end
 % save to folder
 saveas(gcf, 'plots/mu_calve_timelag.pdf')
 
-% functions
+%% Compute the force balance
+index = md.mesh.elements;
+%compute nodal functions coefficients N(x,y)=alpha x + beta y +gamma
+[alpha, beta]=GetNodalFunctionsCoeff(index,md.mesh.x,md.mesh.y);
+summation=[1;1;1];
+
+nt = size(md.results.TransientSolution,2);
+Lx = max(md.mesh.x);
+Ly = max(md.mesh.y);
+ds = 50;
+x = 0:ds:Lx;
+y = 0:ds:Ly;
+[X,~] = meshgrid(x, y);
+if rem(size(X,1), 2) == 0
+    mid_i = size(X,1)/2;
+else
+    mid_i = (size(X,1)+1)/2;
+end
+thalweg_x = X(mid_i,:);
+
+figure;
+color_length = nt;
+red = [255, 51, 153]/255;
+sth = [153, 153, 255]/255;
+colors_p = [linspace(red(1),sth(1),color_length)',...
+    linspace(red(2),sth(2),color_length)',...
+    linspace(red(3),sth(3),color_length)'];
+for i = 30:5:nt
+    tauxx = md.results.TransientSolution(i).DeviatoricStressxx;
+    tauxy = md.results.TransientSolution(i).DeviatoricStressxy;
+    tauxxlist=tauxx(index);
+    tauxylist=tauxy(index);
+    % get H from vertices to elements
+    H = md.results.TransientSolution(i).Thickness;
+    H_list = H(index);
+    H_list = mean(H_list,2);
+    % find directional derivative along x, y
+    dtauxxdx=(tauxxlist.*H_list.*alpha)*summation;
+    dtauxxdy=(tauxxlist.*H_list.*beta)*summation;
+    dtauxydx=(tauxylist.*H_list.*alpha)*summation;
+    dtauxydy=(tauxylist.*H_list.*beta)*summation;
+    % basal stress; get onto elements
+    bs = md.friction.C(1:end-1,i).^2.*md.results.TransientSolution(i).Vel/md.constants.yts;
+    bs_list = bs(index);
+    bs = mean(bs_list,2);
+    % driving stress
+    ds = drivingstress_from_results(md, i);
+    
+    % plot
+    time = md.results.TransientSolution(i).time;
+    plot_title = [md.miscellaneous.name, ', time = ', num2str(time)];
+    mask = md.results.TransientSolution(i).MaskOceanLevelset;
+    mask = mean(mask(index),2);
+%     plotmodel(md,'data',(ds - bs)./ds - fb_ratio0,'caxis',[0,1],'title',title,'mask',mask>0)
+%     pause(0.1)
+    fb_ratio = (ds - bs)./ds;
+    
+    fb_ratio(mask<0) = nan;
+    plot_thalweg_profile(md,fb_ratio,[0,1],colors_p(i,:))
+    title(plot_title)
+    xlim([1e4,6e4])
+end
+
+%% functions
 function bool = compare_GLvalue(str, val)
     filename_split = split(str, '_');
     initials = string(cellfun(@(s) s(1:2), filename_split, 'UniformOutput', false));

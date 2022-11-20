@@ -10,7 +10,8 @@ meshsize = 200; % 200 m
 perturb_duration = 16; % 16 years
 no_retreat_duration = 5; % 5 years no retreat, in the beginning & end
 terminus0_x = 56500; % initialized terminus closed to the front
-retreat_rate_max = 1000; % maximum retreat rate (m/a)
+retreat_rate_max = 120; % maximum retreat rate (m/a)
+calve_seasonal_max = 50; % seasonal variation 
 
 % read in the table
 mdvar_combs = readtable('md_var_combinations.csv');
@@ -26,7 +27,7 @@ tic
 % start iteration
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
-for jj = 16%md_idx
+for jj = 6%md_idx
 
     var_table = mdvar_combs(jj,:);
 
@@ -47,7 +48,7 @@ for jj = 16%md_idx
     end
 
     % RUN
-    for steps = 7
+    for steps = 8
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -575,7 +576,139 @@ for jj = 16%md_idx
             writetable(runtimeTbl, tbl_filename);
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
-           
 
+        if perform(org, 'Transient_SeasonalCalving_MassUnloading')% {{{1 STEP 8
+            md = loadmodel(org, 'Transient_ExtraInfo');
+
+            % parameter regarding time
+            end_time = perturb_duration + 2*no_retreat_duration;
+
+            start_time = md.timestepping.final_time;
+            md.timestepping = timestepping(); 
+            md.timestepping.start_time = start_time;
+            dt_mu = 0.1; % mass unloading update dt
+            dt_calve = 0.1; % calving front position update dt
+
+            % simulation config
+            np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
+            cluster = generic('name', oshostname(), 'np', np);
+            md.cluster = cluster;
+            % relax max iteration (might need in certain shear margin runs)
+            md.stressbalance.maxiter=100;
+            % do not interpolate forcing
+            md.timestepping.interp_forcing = 0;
+
+            %% Calving
+            % forcings
+            retreat_advance = linspace(0,retreat_rate_max, perturb_duration/2*(1/dt_calve));
+            retreat_slow = flip(retreat_advance);
+            retreat_no = zeros(1,no_retreat_duration*(1/dt_calve));
+            retreat_perturb = [retreat_advance, retreat_slow];
+            retreat_seasonal = calve_seasonal_max*sqrt(retreat_perturb).*sin(2*pi*[0:0.1:perturb_duration-0.1]);
+            retreat_sequence = [retreat_no, retreat_perturb + retreat_seasonal, retreat_no];
+            md.frontalforcings.meltingrate = zeros(md.mesh.numberofvertices, 1);
+
+            % enabling movingfront (levelset method), even if we are
+            % prescribing the terminus
+            md.transient.ismovingfront = 1;
+            md.calving.calvingrate = zeros(md.mesh.numberofvertices, 1);
+            
+            % create sequences of terminus position via spclevelset
+            levelset0 = md.mask.ice_levelset;
+            md.levelset.spclevelset = [];
+            md.levelset.spclevelset(:,end+1) = [levelset0; md.timestepping.start_time];
+            
+            culmu_magnitude = 0;
+            calving_start = 1;
+            calving_end   = end_time;
+            
+            % prescribing calving front: change annually
+            for time_i = 1:length(retreat_sequence) % only the few years in the middle
+                magnitude = retreat_sequence(time_i);
+                culmu_magnitude = culmu_magnitude + magnitude;
+                signeddistance = move_terminus_levelset_mod(md, levelset0, culmu_magnitude, -1, true);
+
+                signeddistance(md.geometry.bed>0 & levelset0<0) = -1;
+                pos = find(signeddistance<0);
+
+                if exist('TEMP.exp','file'), delete('TEMP.exp'); end
+                isoline(md, signeddistance, 'value', 0, 'output', 'TEMP.exp');
+                signeddistance = abs(ExpToLevelSet(md.mesh.x, md.mesh.y, 'TEMP.exp'));
+                delete('TEMP.exp');
+                signeddistance(pos) = -signeddistance(pos);
+
+                md.levelset.spclevelset(:,end+1) = [signeddistance; md.timestepping.start_time + time_i*dt_calve];
+            end
+            
+            %% Mass unloading
+            % save previous fields separately
+            % this step help re-assembles all results later easily
+            md_temp = transientrestart(md);
+            previous_results = md_temp.results;
+            next_start_time = md_temp.timestepping.start_time;
+            clear md_temp
+            
+            % initialize
+            new_results = [];
+
+            % get the equivalent coefficients if using Budd sliding law
+            law_from = 'Weertman';
+            law_to = 'Budd';
+            C0 = md.friction.C;
+            H0 = md.results.TransientSolution(end).Thickness;
+            Zb = md.results.TransientSolution(end).Base;
+            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb);
+
+            % add an initial time to the friction coef vector
+            md.friction.C = [C0; next_start_time];
+
+            for it = 1:end_time/dt_mu                                   
+                results = md.results.TransientSolution;
+                % restart and specify sim duration
+                md = transientrestart(md);
+                md.timestepping.time_step = 0.01;
+                md.timestepping.final_time = md.timestepping.start_time + dt_mu;
+                md.settings.output_frequency = dt_mu/md.timestepping.time_step;
+
+                % calculate new fric coef
+                if it == 1
+                    deltaH = zeros(size(md.geometry.thickness));
+                    C = C0;
+                else
+                    deltaH = results(end).Thickness - H0;
+                    % dh/dt is not zero at "steady state; it's just small
+                    % but we ensure not effect was introduced right away
+                    % by setting a threshhold at 0.3
+                    deltaH(deltaH>-0.3) = 0; 
+                end
+                ocean_mask = results(end).MaskOceanLevelset;
+                C = mass_unloading(md, deltaH, k_budd, C0, C, ocean_mask);
+                % append time and assign
+                current_time = md.timestepping.start_time;
+                C_add_time = [C; current_time + dt_mu];
+                md.friction.C = [md.friction.C, C_add_time];
+
+                % solve
+                md = solve(md,'tr');
+
+                % save the new result to a separate var
+                new_results = [new_results,md.results.TransientSolution(1)];
+            end
+            md.results = previous_results;
+            md.results.TransientSolution = new_results;
+            clear previous_results new_results
+
+            savemodel(org, md);
+
+            % run time in seconds, print in minutes
+            runTime = toc;
+            runtimeTbl{jj,1} = string(geometry_name);
+            runtimeTbl{jj,2} = runTime/60;
+            runtimeTbl{jj,3} = steps;
+            runtimeTbl{jj,4} = datetime;
+            writetable(runtimeTbl, tbl_filename);
+            disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
+        end
+           
     end
 end
