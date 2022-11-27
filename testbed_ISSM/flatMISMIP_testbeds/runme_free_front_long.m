@@ -6,18 +6,22 @@ tbl_filename = "";
 %%%%%%%%%%%%%% 
 
 % parameters
-meshsize = 200; % 200 m
-perturb_duration = 16; % 16 years
+meshsize = 200; % size of mesh element (m)
+perturb_duration = 16; % 16 years; but it's not the total perturbation run duration
 no_retreat_duration = 5; % 5 years no retreat, in the beginning & end
 terminus0_x = 56500; % initialized terminus closed to the front
-retreat_rate_max = 120; % maximum retreat rate (m/a)
+retreat_rate_max = 1000; % maximum retreat rate (m/a)
+seasonal_retreat_rate_max = 120; % maximum retreat rate for seasonal calving experiment (m/a)
 calve_seasonal_max = 50; % seasonal variation 
 gauss_xloc = 3.2e4; % x-axis location of the gaussian perturbation (m)
-gauss_mag = 0.3; % fractional reduction in basal shear stress, (1-gauss_mag)*tau_b
+gauss_mag = 0.1; % fractional reduction in basal shear stress, (1-gauss_mag)*tau_b
 gauss_tscale = 2; % flucation time scale. One full cyle is 2 years.
-gauss_width = 1000; % the width of the gaussian patch (m)
-ds = 100; % grid spacing in meter, when interp from mesh to grid
+gauss_width_ratio = 0.08; % the ratio of gaussian perturbation patch to fjord width
+gauss_timestep = 0.1; % temporal resolution of the prescribed gaussian path (yr)
+ds = 100; % grid spacing (m), when interpolate from mesh to grid
 
+% Gaussian basal perturbation modified title
+gauss_title = ['Transient_Calving_GaussianPerturb_', num2str(gauss_mag*10)];
 
 % read in the table
 mdvar_combs = readtable('md_var_combinations.csv');
@@ -33,7 +37,7 @@ tic
 % start iteration
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
-for jj = 6%md_idx
+for jj = 1%md_idx
 
     var_table = mdvar_combs(jj,:);
 
@@ -606,7 +610,7 @@ for jj = 6%md_idx
 
             %% Calving
             % forcings
-            retreat_advance = linspace(0,retreat_rate_max, perturb_duration/2*(1/dt_calve));
+            retreat_advance = linspace(0,seasonal_retreat_rate_max, perturb_duration/2*(1/dt_calve));
             retreat_slow = flip(retreat_advance);
             retreat_no = zeros(1,no_retreat_duration*(1/dt_calve));
             retreat_perturb = [retreat_advance, retreat_slow];
@@ -716,7 +720,7 @@ for jj = 6%md_idx
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
 
-        if perform(org, 'Transient_Calving_GaussianPerturb')% {{{1 STEP 9
+        if perform(org, gauss_title)% {{{1 STEP 9
             md = loadmodel(org, 'Transient_ExtraInfo');
 
             % parameter regarding time
@@ -745,7 +749,7 @@ for jj = 6%md_idx
             retreat_sequence = [retreat_no, retreat_advance, retreat_slow, retreat_no];
             md.frontalforcings.meltingrate = zeros(md.mesh.numberofvertices, 1);
 
-            % enabling movingfront (levelset method), even if we are
+            % enabling movingfront (levelset method), as we are
             % prescribing the terminus
             md.transient.ismovingfront = 1;
             md.calving.calvingrate = zeros(md.mesh.numberofvertices, 1);
@@ -777,16 +781,21 @@ for jj = 6%md_idx
                 md.levelset.spclevelset(:,end+1) = [signeddistance; md.timestepping.start_time + time];
             end
             
-            %% Basal perturbation with a Gaussian patch
+            % Basal perturbation with a Gaussian patch
             % add an initial time column to the friction coef vector
             C0 = md.friction.C;
             md.friction.C = [C0; start_time];
             init_taub = C0.^2.*md.results.TransientSolution(end).Vel./md.constants.yts;
             % create the temporal fluctuation sequence, delta_tau
             start_t = md.levelset.spclevelset(end,1);
-            end_t = md.levelset.spclevelset(end,end);
-            perturb_t = start_t+0.1:0.1:end_t;
-            gauss_mags = gauss_mag*((cos(pi*perturb_t)+1)/2);
+            perturb_t = 0:gauss_timestep:perturb_duration-gauss_timestep;
+            no_perturb_t = 0:gauss_timestep:no_retreat_duration-gauss_timestep;
+            gauss_mags = gauss_mag*((-1*cos(0.5*pi*perturb_t)+1)/2);
+            % add the no perturb period
+            gauss_mags = [zeros(size(no_perturb_t)), gauss_mags, zeros(size(no_perturb_t))];
+            % actual time axis
+            gauss_t = 0:gauss_timestep:(perturb_duration+2*no_retreat_duration-gauss_timestep);
+            gauss_t = gauss_t + (start_t + gauss_timestep);
             % interp from mesh to grid and smooth
             Lx = max(md.mesh.x);
             Ly = max(md.mesh.y);
@@ -801,6 +810,7 @@ for jj = 6%md_idx
             end
             init_taub_grid = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
                             init_taub,x, y, NaN);
+            % smooth the initial basal shear stress field
             for row = 1:size(init_taub_grid,1)
                 init_taub_grid(row,:) = smooth(init_taub_grid(row,:),20);
             end
@@ -809,15 +819,17 @@ for jj = 6%md_idx
             y0_i = mid_i;
             x0_i = x0/ds;
             y0 = ds*mid_i;
-            % interpolate the original 
-            for iter = 1:length(perturb_t)
+            % Friction coefficient fields for all time steps
+            for iter = 1:length(gauss_t)
                 amp = gauss_mags(iter)*init_taub_grid(y0_i,x0_i);
-                delta_taub = transient_slippatch(X,Y,x0,y0,gauss_width,amp);
+                width = gauss_width_ratio*var_table.('fjord_width');
+                delta_taub = transient_slippatch(X,Y,x0,y0,width,amp);
                 % convert back to changes in fric coefficient
                 delta_taub = InterpFromGridToMesh(x',y',delta_taub,md.mesh.x,md.mesh.y,0);
                 delta_C = sqrt(delta_taub./(md.results.TransientSolution(end).Vel/md.constants.yts));
                 delta_C(isinf(delta_C)) = 0;
-                C_new = [C0 - delta_C; perturb_t(iter)];
+                delta_C(isnan(delta_C)) = 0;
+                C_new = [C0 - delta_C; gauss_t(iter)];
                 md.friction.C = [md.friction.C, C_new];
             end
 
