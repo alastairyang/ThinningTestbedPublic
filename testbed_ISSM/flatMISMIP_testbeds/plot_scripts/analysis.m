@@ -9,13 +9,40 @@
 sample_interval = 1000; % meter; distance between two control points
 sample_number = 20; % make # samples along the center line
 ds = 50; % grid spacing, meter
+foldername = 'long_models_yang';
+
+% dictionary
+dict.calving.modelname = 'MISMIP_yangTransient_CalvingOnly.mat';
+dict.calving.save_foldername = 'analyzed_data/calve_only/';
+dict.calving.save_fileprefix = 'ht_calve_';
+
+dict.calving_smw.modelname = 'MISMIP_yangTransient_Calving_SMweakening.mat';
+dict.calving_smw.save_foldername = 'analyzed_data/smw_calve/';
+dict.calving_smw.save_fileprefix = 'ht_smw_calve_';
+
+dict.calving_mu.modelname = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+dict.calving_mu.save_foldername = 'analyzed_data/mu_calve/';
+dict.calving_mu.save_fileprefix = 'ht_mu_calve_';
+
+dict.calving_gp1.modelname = 'MISMIP_yangTransient_Calving_GaussianPerturb_1.mat';
+dict.calving_gp1.save_foldername = 'analyzed_data/gp1_calve/';
+dict.calving_gp1.save_fileprefix = 'ht_gp1_calve_';
+dict.calving_gp2.modelname = 'MISMIP_yangTransient_Calving_GaussianPerturb_2.mat';
+dict.calving_gp2.save_foldername = 'analyzed_data/gp2_calve/';
+dict.calving_gp2.save_fileprefix = 'ht_gp2_calve_';
+dict.calving_gp3.modelname = 'MISMIP_yangTransient_Calving_GaussianPerturb_3.mat';
+dict.calving_gp3.save_foldername = 'analyzed_data/gp3_calve/';
+dict.calving_gp3.save_fileprefix = 'ht_gp3_calve_';
+dict.calving_gp4.modelname = 'MISMIP_yangTransient_Calving_GaussianPerturb_4.mat';
+dict.calving_gp4.save_foldername = 'analyzed_data/gp4_calve/';
+dict.calving_gp4.save_fileprefix = 'ht_gp4_calve_';
 
 %% save calving data from model outputs
-foldername = 'long_models_yang';
-modelname_calving = 'MISMIP_yangTransient_CalvingOnly.mat';
+mddict = dict.calving_gp3;
+modelname_calving = mddict.modelname;
 % destination folder for saved data
-save_foldername  = 'analyzed_data/calve_only/';
-save_fileprefix = 'ht_calve_';
+save_foldername  = mddict.save_foldername;
+save_fileprefix = mddict.save_fileprefix;
 ds_i = sample_interval/ds;
 
 % sorting by natsortfiles

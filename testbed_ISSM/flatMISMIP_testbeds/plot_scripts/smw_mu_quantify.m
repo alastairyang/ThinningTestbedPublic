@@ -3,15 +3,14 @@
 % in the shape (dynamic time warping)
 ref_foldername = "analyzed_data/calve_only";
 ref_folder_prefix = "ht_calve_";
-foldernames = ["analyzed_data/mu_calve","analyzed_data/smw_calve"];
-folder_prefixs = ["ht_mu_calve_","ht_smw_calve_"];
+foldernames = ["analyzed_data/mu_calve","analyzed_data/smw_calve","analyzed_data/gp3_calve"];
+folder_prefixs = ["ht_mu_calve_","ht_smw_calve_","ht_gp3_calve_"];
 
-symbs = [28,128,65; 229,87,9]/255;
+symbs = [28,128,65; 229,87,9; 4,104,107]/255;
 
 md_count = 0;
 figure('Position',[100,100,600,500])
 
-% start with Mass Unloading
 for i = 1:length(foldernames)
     ref_folder_dir = natsortfiles(dir([pwd '/' convertStringsToChars(ref_foldername)]));
     ref_folder_dir = struct2table(ref_folder_dir);
