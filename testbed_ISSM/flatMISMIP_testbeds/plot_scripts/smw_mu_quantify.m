@@ -4,6 +4,7 @@
 ref_foldername = "analyzed_data/calve_only";
 ref_folder_prefix = "ht_calve_";
 foldernames = ["analyzed_data/mu_calve","analyzed_data/smw_calve","analyzed_data/gp3_calve"];
+legends = ["Effective pressure feedback","Shear margin weakening","Basal perturbation"];
 folder_prefixs = ["ht_mu_calve_","ht_smw_calve_","ht_gp3_calve_"];
 
 symbs = [28,128,65; 229,87,9; 4,104,107]/255;
@@ -21,7 +22,9 @@ for i = 1:length(foldernames)
     folder_dir = folder_dir(bools,:);
     bools = cellfun(@(s) ~strcmp(s(1),'.'), ref_folder_dir.name);
     ref_folder_dir = ref_folder_dir(bools,:);
-    
+
+    MAEs_exp = [];
+    dtw_dists_exp = [];
     for j = 1:size(folder_dir,1)
         % skip the irrelevant ones
         md_count = md_count + 1;
@@ -69,14 +72,17 @@ for i = 1:length(foldernames)
         end
 %         MAE = mean(MAEs);
 %         dtw_dist = max(dtw_dists);
-
-        scatter(MAEs, dtw_dists, 25,symbs(i,:),'filled','MarkerFaceAlpha',0.4);
+        MAEs_exp = [MAEs_exp, MAEs];
+        dtw_dists_exp = [dtw_dists_exp, dtw_dists];
         hold on
     end
+    scatter(MAEs_exp, dtw_dists_exp, 25,symbs(i,:),'filled','MarkerFaceAlpha',0.4,'DisplayName',legends(i));
+
     set(gca,'xscale','log')
     set(gca,'yscale','log')
 end
-xlabel('Mean Absolute Error','Interpreter','latex','FontSize',13)
-ylabel('Shape dissimilarity','Interpreter','latex','FontSize',13)
+xlabel('Magnitude difference (Mean Absolute Error)','Interpreter','latex','FontSize',16)
+ylabel('Shape dissimilarity (Dynamic Time Warping)','Interpreter','latex','FontSize',16)
+legend('Location','northwest','FontSize',13,'FontName','Times')
 
 saveas(gcf, 'plots/mu_smw_distance.pdf')

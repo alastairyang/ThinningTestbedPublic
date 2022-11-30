@@ -1,6 +1,8 @@
 % plot the scatter plot: lagtime gradient and lagtime magnitude
 % first plot is calving-only
 reversal_year = 5+8; % 5 year stationary in the beginning and 8 accelerated retreat years.
+sample_number = 20; % make # samples along the center line
+sample_interval = 1000; % meter; distance between two control points
 
 foldername = 'analyzed_data/calve_only';
 folder_prefix = 'ht_calve_';
@@ -102,14 +104,14 @@ for j = 1:length(GLs) % iterate over grounding line depths
         GL_symb = GLs_symb(GL==GLs);
         FC_symb = FCs_symb(FC==FCs,:);
         scp1 = scatter(slope, mean_tau, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
-        errorbar(slope, mean_tau, min_tau, max_tau,'k')
+        %errorbar(slope, mean_tau, min_tau, max_tau,'k')
         hold on
 
     end
     ylim([0,12])
     xlim([0,0.6])
-    ylabel('$\tau$ (yr)','Interpreter','latex','FontSize',13)
-    xlabel('$\partial \tau/\partial x$ (yr/km)','Interpreter','latex','FontSize',13)
+    ylabel('$\tilde{\tau}$ (yr)','Interpreter','latex','FontSize',16)
+    xlabel('$\partial \tau/\partial x$ (yr/km)','Interpreter','latex','FontSize',16)
 
 end
 legend off
@@ -210,7 +212,7 @@ for j = 1:length(GLs) % iterate over grounding line depths
         GL_symb = GLs_symb(GL==GLs);
         FC_symb = FCs_symb(FC==FCs,:);
         scatter(slope, mean_tau, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
-        errorbar(slope, mean_tau, min_tau, max_tau,'k')
+        %errorbar(slope, mean_tau, min_tau, max_tau,'k')
         hold on
 
     end

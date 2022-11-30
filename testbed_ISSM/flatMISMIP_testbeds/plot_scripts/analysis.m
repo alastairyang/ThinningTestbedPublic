@@ -122,240 +122,6 @@ for i = 1:size(folder_dir,1)
     end
 end
 
-%% saving calving+shear margin weakening data from model outputs
-foldername = 'long_models_yang';
-modelname_calving_smw = 'MISMIP_yangTransient_Calving_SMweakening.mat';
-save_foldername  = 'analyzed_data/smw_calve/';
-save_fileprefix = 'ht_smw_calve_';
-ds_i = sample_interval/ds;
-
-folder_dir = dir([pwd '/' foldername]);
-
-plot_idx = 0;
-md_count = 0;
-for i = 1:size(folder_dir,1)
-    % skip the irrelevant ones
-    if ~strcmp(folder_dir(i).name(1), 'm')
-        continue
-    else
-        md_count = md_count + 1;
-        smw_md =   load([folder_dir(i).folder '/' folder_dir(i).name '/' modelname_calving_smw]).md;
-        nt = size(smw_md.results.TransientSolution,2);
-        
-        % geometry parameters
-        Lx = max(smw_md.mesh.x);
-        Ly = max(smw_md.mesh.y);
-        x = 0:ds:Lx;
-        y = 0:ds:Ly;
-        [X,~] = meshgrid(x, y);
-        if rem(size(X,1), 2) == 0
-            mid_i = size(X,1)/2;
-        else
-            mid_i = (size(X,1)+1)/2;
-        end
-        thalweg_x = X(mid_i,:);
-        % save the mesh elements and (x,y)
-        mesh_elements = smw_md.mesh.elements;
-        mesh_x = smw_md.mesh.x;
-        mesh_y = smw_md.mesh.y;
-        % retrieve the last position of the ice front; spclevelset ~= 0
-        pos = find(smw_md.levelset.spclevelset(1:end-1,end) < 1 & smw_md.levelset.spclevelset(1:end-1,end) > -1);
-        x_front = min(mesh_x(pos));
-        % find grid index where we want to sample h(t)
-        [~, x_i_nearest] = min(abs(x - x_front));
-        % sampled points: start at 1 interval behind the last ice front
-        % 
-        front_i = x_i_nearest-ds_i;
-        end_i   = front_i - sample_number*ds_i;
-        sample_i = front_i:-ds_i:(end_i+ds_i);
-
-        % remove model class; data store in table instead to clear space
-        smw_results = struct2table(smw_md.results.TransientSolution);
-        empty_md = smw_md;
-        empty_md.results.TransientSolution = [];
-        clear smw_md 
-        
-        % initialize space to stare h(t)
-        thalweg_sample_ht = [];
-
-        % get all h(t) data
-        for j = 1:nt
-            smw_surface   = InterpFromMeshToGrid(empty_md.mesh.elements, mesh_x, mesh_y,...
-                                               smw_results.Thickness{j},...
-                                               x, y, NaN);
-            % elevations
-            surface_profile  = smw_surface(mid_i,sample_i);
-            thalweg_sample_ht = [thalweg_sample_ht; surface_profile];
-        end
-        
-         % time vector
-         time = smw_results.time;
-         time = time - time(1);
-
-         % save data
-         ht_data.h = thalweg_sample_ht;
-         ht_data.t = time;
-         filename = [save_foldername, save_fileprefix, folder_dir(i).name,'.mat'];
-         save(filename,'ht_data')
-    end
-end
-
-%% saving calving+mass_unloading data from model outputs
-foldername = 'long_models_yang';
-modelname_calving_smw = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
-save_foldername  = 'analyzed_data/mu_calve/';
-save_fileprefix = 'ht_mu_calve_';
-ds_i = sample_interval/ds;
-
-folder_dir = dir([pwd '/' foldername]);
-
-plot_idx = 0;
-md_count = 0;
-for i = 1:size(folder_dir,1)
-    % skip the irrelevant ones
-    if ~strcmp(folder_dir(i).name(1), 'm')
-        continue
-    else
-        md_count = md_count + 1;
-        md =   load([folder_dir(i).folder '/' folder_dir(i).name '/' modelname_calving_smw]).md;
-        nt = size(md.results.TransientSolution,2);
-        
-        % geometry parameters
-        Lx = max(md.mesh.x);
-        Ly = max(md.mesh.y);
-        x = 0:ds:Lx;
-        y = 0:ds:Ly;
-        [X,~] = meshgrid(x, y);
-        if rem(size(X,1), 2) == 0
-            mid_i = size(X,1)/2;
-        else
-            mid_i = (size(X,1)+1)/2;
-        end
-        thalweg_x = X(mid_i,:);
-        % save the mesh elements and (x,y)
-        mesh_elements = md.mesh.elements;
-        mesh_x = md.mesh.x;
-        mesh_y = md.mesh.y;
-        % retrieve the last position of the ice front; spclevelset ~= 0
-        pos = find(md.levelset.spclevelset(1:end-1,end) < 1 & md.levelset.spclevelset(1:end-1,end) > -1);
-        x_front = min(mesh_x(pos));
-        % find grid index where we want to sample h(t)
-        [~, x_i_nearest] = min(abs(x - x_front));
-        % sampled points: start at 1 interval behind the last ice front
-        % 
-        front_i = x_i_nearest-ds_i;
-        end_i   = front_i - sample_number*ds_i;
-        sample_i = front_i:-ds_i:(end_i+ds_i);
-
-        % remove model class; data store in table instead to clear space
-        results = struct2table(md.results.TransientSolution);
-        empty_md = md;
-        empty_md.results.TransientSolution = [];
-        clear md 
-        
-        % initialize space to stare h(t)
-        thalweg_sample_ht = [];
-
-        % get all h(t) data
-        for j = 1:nt
-            surface   = InterpFromMeshToGrid(empty_md.mesh.elements, mesh_x, mesh_y,...
-                                               results.Thickness{j},...
-                                               x, y, NaN);
-            % elevations
-            surface_profile  = surface(mid_i,sample_i);
-            thalweg_sample_ht = [thalweg_sample_ht; surface_profile];
-        end
-        
-         % time vector
-         time = results.time;
-         time = time - time(1);
-
-         % save data
-         ht_data.h = thalweg_sample_ht;
-         ht_data.t = time;
-         filename = [save_foldername, save_fileprefix, folder_dir(i).name,'.mat'];
-         save(filename,'ht_data')
-    end
-end
-
-%% saving seasonal_calving + mass_unloading data from model outputs
-foldername = 'long_models_yang';
-modelname_calving_smw = 'MISMIP_yangTransient_SeasonalCalving_MassUnloading.mat';
-save_foldername  = 'analyzed_data/mu_seasoncalve/';
-save_fileprefix = 'ht_mu_seasoncalve_';
-ds_i = sample_interval/ds;
-
-folder_dir = dir([pwd '/' foldername]);
-
-plot_idx = 0;
-md_count = 0;
-for i = 1:size(folder_dir,1)
-    % skip the irrelevant ones
-    if ~strcmp(folder_dir(i).name(1), 'm')
-        continue
-    else
-        md_count = md_count + 1;
-        md =   load([folder_dir(i).folder '/' folder_dir(i).name '/' modelname_calving_smw]).md;
-        nt = size(md.results.TransientSolution,2);
-        
-        % geometry parameters
-        Lx = max(md.mesh.x);
-        Ly = max(md.mesh.y);
-        x = 0:ds:Lx;
-        y = 0:ds:Ly;
-        [X,~] = meshgrid(x, y);
-        if rem(size(X,1), 2) == 0
-            mid_i = size(X,1)/2;
-        else
-            mid_i = (size(X,1)+1)/2;
-        end
-        thalweg_x = X(mid_i,:);
-        % save the mesh elements and (x,y)
-        mesh_elements = md.mesh.elements;
-        mesh_x = md.mesh.x;
-        mesh_y = md.mesh.y;
-        % retrieve the last position of the ice front; spclevelset ~= 0
-        pos = find(md.levelset.spclevelset(1:end-1,end) < 1 & md.levelset.spclevelset(1:end-1,end) > -1);
-        x_front = min(mesh_x(pos));
-        % find grid index where we want to sample h(t)
-        [~, x_i_nearest] = min(abs(x - x_front));
-        % sampled points: start at 1 interval behind the last ice front
-        % 
-        front_i = x_i_nearest-ds_i;
-        end_i   = front_i - sample_number*ds_i;
-        sample_i = front_i:-ds_i:(end_i+ds_i);
-
-        % remove model class; data store in table instead to clear space
-        results = struct2table(md.results.TransientSolution);
-        empty_md = md;
-        empty_md.results.TransientSolution = [];
-        clear md 
-        
-        % initialize space to stare h(t)
-        thalweg_sample_ht = [];
-
-        % get all h(t) data
-        for j = 1:nt
-            surface   = InterpFromMeshToGrid(empty_md.mesh.elements, mesh_x, mesh_y,...
-                                               results.Thickness{j},...
-                                               x, y, NaN);
-            % elevations
-            surface_profile  = surface(mid_i,sample_i);
-            thalweg_sample_ht = [thalweg_sample_ht; surface_profile];
-        end
-        
-         % time vector
-         time = results.time;
-         time = time - time(1);
-
-         % save data
-         ht_data.h = thalweg_sample_ht;
-         ht_data.t = time;
-         filename = [save_foldername, save_fileprefix, folder_dir(i).name,'.mat'];
-         save(filename,'ht_data')
-    end
-end
-
 %% time lag to reversal: calving only
 reversal_year = 5+8; % 5 year stationary in the beginning and 8 accelerated retreat years.
 
@@ -679,69 +445,140 @@ end
 saveas(gcf, 'plots/mu_seasoncalve_timelag.pdf')
 
 %% Compute the force balance
-index = md.mesh.elements;
-%compute nodal functions coefficients N(x,y)=alpha x + beta y +gamma
-[alpha, beta]=GetNodalFunctionsCoeff(index,md.mesh.x,md.mesh.y);
-summation=[1;1;1];
+% we plot the force balance of two models side by side
+md1_name = "model_W5000_GL0_FC120000";
+md2_name = "model_W5000_GL0_FC30000";
+model_type = "MISMIP_yangTransient_Calving_MassUnloading.mat";
+md1 = load("long_models_yang/" + md1_name + "/" + model_type).md;
+md2 = load("long_models_yang/" + md2_name + "/" + model_type).md;
+mds = [md1, md2];
 
-nt = size(md.results.TransientSolution,2);
-Lx = max(md.mesh.x);
-Ly = max(md.mesh.y);
-ds = 50;
-x = 0:ds:Lx;
-y = 0:ds:Ly;
-[X,~] = meshgrid(x, y);
-if rem(size(X,1), 2) == 0
-    mid_i = size(X,1)/2;
-else
-    mid_i = (size(X,1)+1)/2;
-end
-thalweg_x = X(mid_i,:);
-
+gif('plots/force_balance_planview.gif')
 figure;
-color_length = nt;
-red = [255, 51, 153]/255;
-sth = [153, 153, 255]/255;
-colors_p = [linspace(red(1),sth(1),color_length)',...
-    linspace(red(2),sth(2),color_length)',...
-    linspace(red(3),sth(3),color_length)'];
-for i = 30:5:nt
-    tauxx = md.results.TransientSolution(i).DeviatoricStressxx;
-    tauxy = md.results.TransientSolution(i).DeviatoricStressxy;
-    tauxxlist=tauxx(index);
-    tauxylist=tauxy(index);
-    % get H from vertices to elements
-    H = md.results.TransientSolution(i).Thickness;
-    H_list = H(index);
-    H_list = mean(H_list,2);
-    % find directional derivative along x, y
-    dtauxxdx=(tauxxlist.*H_list.*alpha)*summation;
-    dtauxxdy=(tauxxlist.*H_list.*beta)*summation;
-    dtauxydx=(tauxylist.*H_list.*alpha)*summation;
-    dtauxydy=(tauxylist.*H_list.*beta)*summation;
-    % basal stress; get onto elements
-    bs = md.friction.C(1:end-1,i).^2.*md.results.TransientSolution(i).Vel/md.constants.yts;
-    bs_list = bs(index);
-    bs = mean(bs_list,2);
-    % driving stress
-    ds = drivingstress_from_results(md, i);
+for md_i = 1:length(mds)
+    md = mds(md_i);
+    index = md.mesh.elements;
+    %compute nodal functions coefficients N(x,y)=alpha x + beta y +gamma
+    [alpha, beta]=GetNodalFunctionsCoeff(index,md.mesh.x,md.mesh.y);
+    summation=[1;1;1];
     
-    % plot
-    time = md.results.TransientSolution(i).time;
-    plot_title = [md.miscellaneous.name, ', time = ', num2str(time)];
-    mask = md.results.TransientSolution(i).MaskOceanLevelset;
-    mask = mean(mask(index),2);
-%     plotmodel(md,'data', dtauxxdx,'caxis',[-0.5e5,0.5e5],'title',plot_title,'mask',mask>0)
-%     pause(0.1)
+    nt = size(md.results.TransientSolution,2);
+    Lx = max(md.mesh.x);
+    Ly = max(md.mesh.y);
+    ds = 50;
+    x = 0:ds:Lx;
+    y = 0:ds:Ly;
+    [X,~] = meshgrid(x, y);
+    if rem(size(X,1), 2) == 0
+        mid_i = size(X,1)/2;
+    else
+        mid_i = (size(X,1)+1)/2;
+    end
+    thalweg_x = X(mid_i,:);
+    
+    color_length = nt;
+    red = [255, 51, 153]/255;
+    sth = [153, 153, 255]/255;
+    colors_p = [linspace(red(1),sth(1),color_length)',...
+        linspace(red(2),sth(2),color_length)',...
+        linspace(red(3),sth(3),color_length)'];
+    fb_ratio_last = 0;
+    iter_count = 0;
+    % iterate over time
+    for i = 30:5:nt
+        iter_count = iter_count + 1;
+        tauxx = md.results.TransientSolution(i).DeviatoricStressxx;
+        tauxy = md.results.TransientSolution(i).DeviatoricStressxy;
+        tauxxlist=tauxx(index);
+        tauxylist=tauxy(index);
+        % get H from vertices to elements
+        H = md.results.TransientSolution(i).Thickness;
+        H_list = H(index);
+        H_list = mean(H_list,2);
+        % find directional derivative along x, y
+        dtauxxdx=(tauxxlist.*H_list.*alpha)*summation;
+        dtauxxdy=(tauxxlist.*H_list.*beta)*summation;
+        dtauxydx=(tauxylist.*H_list.*alpha)*summation;
+        dtauxydy=(tauxylist.*H_list.*beta)*summation;
+        % basal stress; get onto elements
+        if size(md.friction.C,2) == 1
+            % no sliding law coefficient change
+            bs = md.friction.C.^2.*md.results.TransientSolution(i).Vel/md.constants.yts;
+        else
+            % mass unloading experiment
+            bs = md.friction.C(1:end-1,i).^2.*md.results.TransientSolution(i).Vel/md.constants.yts;
+        end
+        bs_list = bs(index);
+        bs = mean(bs_list,2);
+        % driving stress
+        ds = drivingstress_from_results(md, i);
+        
+        time = md.results.TransientSolution(i).time;
+        plot_title = [md.miscellaneous.name, ', time = ', num2str(time)];
+        mask = md.results.TransientSolution(i).MaskOceanLevelset;
+        mask = mean(mask(index),2);
+    
+        % force balance: longitudinal-lateral stress gradient / driving
+        % stress
+        % The part of d(tauxx)/dx that contributes to the driving stress,
+        % we single it out, remove from resistive calculation, and add to
+        % the driving stress
+        ds_dtauxxdx = zeros(size(dtauxxdx));
+        ds_dtauxxdx(dtauxxdx>0) = dtauxxdx(dtauxxdx>0);
+        dtauxxdx(dtauxxdx>0) = 0;
+        resistive = -(dtauxxdx + dtauxydy);
+        fb_ratio = resistive./(ds + ds_dtauxxdx);
+        
+        fb_ratio(mask<0) = nan;
+        
+%        subplot(1,length(mds),md_i)
 
-    fb_ratio = (ds - bs)./ds;
-    
-    fb_ratio(mask<0) = nan;
-    plot_thalweg_profile(md,fb_ratio,[0,1],colors_p(i,:))
-    title(plot_title)
-    xlim([1e4,6e4])
+        Lx = max(md.mesh.x);
+        Ly = max(md.mesh.y);
+        ds = 250;
+        x = 0:ds:Lx;
+        y = 0:ds:Ly;
+        [X,~] = meshgrid(x, y);
+        if rem(size(X,1), 2) == 0
+            mid_i = size(X,1)/2;
+        else
+            mid_i = (size(X,1)+1)/2;
+        end
+        thalweg_x = X(mid_i,:);
+        
+        mask = md.results.TransientSolution(i).MaskOceanLevelset;
+        field_grid = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
+                            fb_ratio, x, y, NaN);
+        field_profile = field_grid(mid_i,:);
+        field_prof_smooth = smooth(field_profile(~isnan(field_profile)),15);
+        field_profile(~isnan(field_profile)) = field_prof_smooth;
+%         delta_field_profile = field_profile - field_profile_last;
+%         % update field_profile_last
+%         field_profile_last = field_profile;
+%         % look for only 15 km behind the grounding line
+        if iter_count == 1
+            continue 
+        else
+
+%             gl_x = locate_groundingline(md,mask);
+%             x_keep = find(thalweg_x > gl_x-1.5e4 & thalweg_x < gl_x);
+%             % truncate
+%             field_profile = field_profile(x_keep);
+%             thalweg_x = thalweg_x(x_keep);
+%             thalweg_x = thalweg_x - max(thalweg_x);
+%         % plot
+%             plot(thalweg_x, field_profile, Color=colors_p(i,:));hold on;
+%             title(plot_title)
+%             ylim([0,1])
+%             pause(0.1)
+            gif
+            plotmodel(md,'data',fb_ratio - fb_ratio_last,'caxis',[0,0.2],'mask',mask)
+            fb_ratio_last = fb_ratio;
+            pause(0.2)
+        end
+        %plotmodel(md,'data',-dtauxxdx,'caxis',[0,2e4])
+    end
 end
-
 %% Ice volume timeseries
 results_tbl = struct2table(md.results.TransientSolution);
 figure;
