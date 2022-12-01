@@ -579,10 +579,6 @@ for md_i = 1:length(mds)
         %plotmodel(md,'data',-dtauxxdx,'caxis',[0,2e4])
     end
 end
-%% Ice volume timeseries
-results_tbl = struct2table(md.results.TransientSolution);
-figure;
-plot(results_tbl.time, gradient(smooth(results_tbl.IceVolume, 20)))
 
 %% functions
 function bool = compare_GLvalue(str, val)

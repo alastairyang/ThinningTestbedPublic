@@ -114,7 +114,11 @@ for j = 1:length(GLs) % iterate over grounding line depths
     xlabel('$\partial \tau/\partial x$ (yr/km)','Interpreter','latex','FontSize',16)
 
 end
-legend off
+% add made-up legends
+S1 = scatter(nan,nan,10,'k','o');
+S2 = scatter(nan,nan,10,'k','square');
+legend([S1 S2],{'Shallow','Deep'},'FontSize',12,'Box','off','Interpreter','latex')
+
 
 % save to folder
 saveas(gcf, 'plots/calve_timelag_scatter.pdf')
@@ -222,7 +226,10 @@ for j = 1:length(GLs) % iterate over grounding line depths
 %     subplot(3,3,4)
 %     ylabel('Lag time (yr)','Interpreter','latex',FontSize=13)
 end
-legend off
+% add made-up legends
+S1 = scatter(nan,nan,10,'k','o');
+S2 = scatter(nan,nan,10,'k','square');
+legend([S1 S2],{'Shallow','Deep'},'FontSize',12,'Box','off','Interpreter','latex')
 
 % save to folder
 saveas(gcf, 'plots/mu_calve_timelag_scatter.pdf')
