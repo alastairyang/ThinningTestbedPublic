@@ -15,7 +15,7 @@ seasonal_retreat_rate_max = 120; % maximum retreat rate for seasonal calving exp
 calve_seasonal_max = 50; % seasonal variation 
 gauss_xloc = 3.2e4; % x-axis location of the gaussian perturbation (m)
 gauss_mag = 0.1; % fractional reduction in basal shear stress, (1-gauss_mag)*tau_b
-gauss_tscale = 2; % flucation time scale. One full cyle is 2 years.
+gauss_tscale = 2; % flucation time scale. One full cyle is 2*2 years.
 gauss_width_ratio = 0.08; % the ratio of gaussian perturbation patch to fjord width
 gauss_timestep = 0.1; % temporal resolution of the prescribed gaussian path (yr)
 ds = 100; % grid spacing (m), when interpolate from mesh to grid
@@ -720,7 +720,7 @@ for jj = 1%md_idx
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
 
-        if perform(org, gauss_title)% {{{1 STEP 9
+        if perform(org, gauss_title)% {{{1 STEP 9: Basal perturbation: gaussian patch
             md = loadmodel(org, 'Transient_ExtraInfo');
 
             % parameter regarding time
