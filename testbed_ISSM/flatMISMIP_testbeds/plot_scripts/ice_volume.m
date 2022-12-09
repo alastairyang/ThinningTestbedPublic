@@ -35,29 +35,32 @@ for i = 1:length(md_paths)
     md = load(md_paths(i)).md;
     results_tbl = struct2table(md.results.TransientSolution);
     times{i} = transpose(results_tbl.time);
+    times{i} = times{i} - times{i}(1);
     dt = mean(times{i}(2:end) - times{i}(1:end-1));
     ice_volumes_grad{i} = transpose(gradient(smooth(results_tbl.IceVolume, 20),0.1));
     ice_volumes{i} = transpose((results_tbl.IceVolume));
 end
 
-%% plot
-figure('Position',[100,100,600,600])
-p1 = subplot(2,1,1);
+%% plot a subset of all data
+subset_md = [1,2];
+% shallower grounding line
+figure('Position',[100,100,600,400])
+p1 = subplot(1,1,1);
 % ice volume
-for i = 1:length(md_paths)
+for i = subset_md
     plot(times{i}(1:10:end), ice_volumes{i}(1:10:end),...
          "Color", colors(i,:), 'LineStyle', styles(i),'Marker',markers(i),'LineWidth',2);
     hold on
 end
-set(gca,'XTickLabel',[]);
+set(gca,'YTickLabel',[]);
 % create path to fill in the area between curves with and without feedback
 patch([times{1} fliplr(times{2})], [ice_volumes{1} fliplr(ice_volumes{2})], colors(1,:))
-patch([times{3} fliplr(times{4})], [ice_volumes{3} fliplr(ice_volumes{4})], colors(3,:))
+%patch([times{3} fliplr(times{4})], [ice_volumes{3} fliplr(ice_volumes{4})], colors(3,:))
 % the retreat stops at the 22nd year in the perturbation. We grey out the
 % years beyond
 yr_stop = times{1}(1) + 22;
 [d,ix] = min(abs(times{1}-yr_stop));
-area(times{4}(ix:end),5.5e11*ones(size(times{4}(ix:end))),0)
+area(times{4}(ix:end),5.5e11*ones(size(times{4}(ix:end))),0,'FaceColor',[.25,.25,.25])
 alpha(0.2)
 hold off;
 ylim([3.4e11,4.8e11])
@@ -65,30 +68,83 @@ xlim([times{4}(1), times{4}(end)])
 ylabel('Ice volume ($m^3$)','Interpreter','latex','FontSize',16)
 
 % time rate of ice volume
-p2 = subplot(2,1,2);
+% p2 = subplot(2,1,2);
+% for i = 1:length(md_paths)
+%     plot(times{i}(1:10:end), ice_volumes_grad{i}(1:10:end),...
+%          "Color", colors(i,:), 'LineStyle', styles(i),'Marker',markers(i),'LineWidth',2);
+%     hold on
+% end
+% % create path to fill in the area between curves with and without feedback
+% patch([times{1} fliplr(times{2})], [ice_volumes_grad{1} fliplr(ice_volumes_grad{2})], colors(1,:))
+% patch([times{3} fliplr(times{4})], [ice_volumes_grad{3} fliplr(ice_volumes_grad{4})], colors(3,:))
+% % the retreat stops at the 22nd year in the perturbation. We grey out the
+% % years beyond
+% yr_stop = times{1}(1) + 22;
+% [d,ix] = min(abs(times{1}-yr_stop));
+% area(times{4}(ix:end),-9e9*ones(size(times{4}(ix:end))),2e9)
+% alpha(0.2)
+% hold off;
+% ylim([-8e9,0])
+% xlim([times{4}(1), times{4}(end)])
+% q1 = get(p1, 'Position');
+% q2 = get(p2, 'Position');
+% q1(2) = q2(2)+q2(4);
+% set(p1, 'pos', q1);
+xlabel('Time (yr)','Interpreter','latex','FontSize',16)
+ylabel('Ice volume change rate ($m^3/a$)','Interpreter','latex','FontSize',16)
+legend(legend_strs(subset_md),'Location','southwest','box','off','FontSize',16,'FontName','Times')
+
+saveas(gcf, 'plots/ice_volume1.pdf')
+
+%% plot
+figure('Position',[100,100,600,400])
+p1 = subplot(1,1,1);
+% ice volume
 for i = 1:length(md_paths)
-    plot(times{i}(1:10:end), ice_volumes_grad{i}(1:10:end),...
+    plot(times{i}(1:10:end), ice_volumes{i}(1:10:end),...
          "Color", colors(i,:), 'LineStyle', styles(i),'Marker',markers(i),'LineWidth',2);
     hold on
 end
+set(gca,'YTickLabel',[]);
 % create path to fill in the area between curves with and without feedback
-patch([times{1} fliplr(times{2})], [ice_volumes_grad{1} fliplr(ice_volumes_grad{2})], colors(1,:))
-patch([times{3} fliplr(times{4})], [ice_volumes_grad{3} fliplr(ice_volumes_grad{4})], colors(3,:))
+patch([times{1} fliplr(times{2})], [ice_volumes{1} fliplr(ice_volumes{2})], colors(1,:))
+patch([times{3} fliplr(times{4})], [ice_volumes{3} fliplr(ice_volumes{4})], colors(3,:))
 % the retreat stops at the 22nd year in the perturbation. We grey out the
 % years beyond
 yr_stop = times{1}(1) + 22;
 [d,ix] = min(abs(times{1}-yr_stop));
-area(times{4}(ix:end),-9e9*ones(size(times{4}(ix:end))),2e9)
+area(times{4}(ix:end),5.5e11*ones(size(times{4}(ix:end))),0,'FaceColor',[.25,.25,.25])
 alpha(0.2)
 hold off;
-ylim([-8e9,0])
+ylim([3.4e11,4.8e11])
 xlim([times{4}(1), times{4}(end)])
-q1 = get(p1, 'Position');
-q2 = get(p2, 'Position');
-q1(2) = q2(2)+q2(4);
-set(p1, 'pos', q1);
+ylabel('Ice volume ($m^3$)','Interpreter','latex','FontSize',16)
+
+% time rate of ice volume
+% p2 = subplot(2,1,2);
+% for i = 1:length(md_paths)
+%     plot(times{i}(1:10:end), ice_volumes_grad{i}(1:10:end),...
+%          "Color", colors(i,:), 'LineStyle', styles(i),'Marker',markers(i),'LineWidth',2);
+%     hold on
+% end
+% % create path to fill in the area between curves with and without feedback
+% patch([times{1} fliplr(times{2})], [ice_volumes_grad{1} fliplr(ice_volumes_grad{2})], colors(1,:))
+% patch([times{3} fliplr(times{4})], [ice_volumes_grad{3} fliplr(ice_volumes_grad{4})], colors(3,:))
+% % the retreat stops at the 22nd year in the perturbation. We grey out the
+% % years beyond
+% yr_stop = times{1}(1) + 22;
+% [d,ix] = min(abs(times{1}-yr_stop));
+% area(times{4}(ix:end),-9e9*ones(size(times{4}(ix:end))),2e9)
+% alpha(0.2)
+% hold off;
+% ylim([-8e9,0])
+% xlim([times{4}(1), times{4}(end)])
+% q1 = get(p1, 'Position');
+% q2 = get(p2, 'Position');
+% q1(2) = q2(2)+q2(4);
+% set(p1, 'pos', q1);
 xlabel('Time (yr)','Interpreter','latex','FontSize',16)
 ylabel('Ice volume change rate ($m^3/a$)','Interpreter','latex','FontSize',16)
-legend(legend_strs,'Location','southwest','box','off')
+legend(legend_strs,'Location','southwest','box','off','FontSize',16,'FontName','Times')
 
-saveas(gcf, 'plots/ice_volume.pdf')
+saveas(gcf, 'plots/ice_volume2.pdf')
