@@ -1,10 +1,7 @@
-% runme_free_front.m template.
-%%%%%%%%%%%%%% DON'T CHANGE THE FOLLOWING LINES / DON'T MODIFY LINE NO. %%%%%%%%%%%%%%
-% specify model index; specify 
-md_idx = [];
-tbl_filename = "";
-gauss_mag = 0.1; % fractional reduction in basal shear stress, (1-gauss_mag)*tau_b
-%%%%%%%%%%%%%% 
+function runme_gauss() 
+md_idx = [1]; 
+tbl_filename = "runtime_table_gauss_3.csv"; 
+gauss_mag = 0.3; 
 
 % parameters
 meshsize = 200; % size of mesh element (m)
@@ -1058,3 +1055,4 @@ end
 
 
 
+end

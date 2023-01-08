@@ -127,7 +127,6 @@ saveas(gcf, 'plots/calve_timelag_scatter.pdf')
 alpha(0.2)
 
 % make calving-only less transparent; add mass unloading + calving
-
 foldername = 'analyzed_data/mu_calve';
 folder_prefix = 'ht_mu_calve_';
 folder_dir = natsortfiles(dir([pwd '/' foldername]));
