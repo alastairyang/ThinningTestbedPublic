@@ -3,6 +3,8 @@
 %    is easier to work with, meanwhile extracting the timeseries at selected
 %    points along the centerline.
 
+% This file should be run at "flatMISMIP_testbeds"
+
 %% global parameters
 % parameters
 sample_interval = 1000; % meter; distance between two control points
@@ -36,10 +38,21 @@ dict.calving_gp4.modelname = 'MISMIP_yangTransient_Calving_GaussianPerturb_4.mat
 dict.calving_gp4.save_foldername = 'analyzed_data/gp4_calve/';
 dict.calving_gp4.save_fileprefix = 'ht_gp4_calve_';
 
+dict.calving_mu_gp1.modelname = 'MISMIP_yangTransient_Calving_MassUnloading_GaussianPerturb_1.mat';
+dict.calving_mu_gp1.save_foldername = 'analyzed_data/gp1_mu_calve';
+dict.calving_mu_gp1.save_fileprefix = 'ht_gp1_mu_calve_';
+dict.calving_mu_gp2.modelname = 'MISMIP_yangTransient_Calving_MassUnloading_GaussianPerturb_2.mat';
+dict.calving_mu_gp2.save_foldername = 'analyzed_data/gp2_mu_calve';
+dict.calving_mu_gp2.save_fileprefix = 'ht_gp2_mu_calve_';
+dict.calving_mu_gp3.modelname = 'MISMIP_yangTransient_Calving_MassUnloading_GaussianPerturb_3.mat';
+dict.calving_mu_gp3.save_foldername = 'analyzed_data/gp3_mu_calve';
+dict.calving_mu_gp3.save_fileprefix = 'ht_gp3_mu_calve_';
+dict.calving_mu_gp4.modelname = 'MISMIP_yangTransient_Calving_MassUnloading_GaussianPerturb_4.mat';
+dict.calving_mu_gp4.save_foldername = 'analyzed_data/gp4_mu_calve';
+dict.calving_mu_gp4.save_fileprefix = 'ht_gp4_mu_calve_';
 %% save __ data from model outputs into .mat
 % specify the experiment that you want to extract data from
 mddict = dict.calving_gp4;
-
 
 modelname_calving = mddict.modelname;
 save_foldername  = mddict.save_foldername;
@@ -87,7 +100,8 @@ for i = 1:size(folder_dir,1)
         front_i = x_i_nearest-ds_i;
         end_i   = front_i - sample_number*ds_i;
         sample_i = front_i:-ds_i:(end_i+ds_i);
-
+        % get the absolute distance
+        sample_x = x(sample_i);
 
         % remove model class; data store in table instead to clear space
         calve_results = struct2table(calve_md.results.TransientSolution);
@@ -119,6 +133,7 @@ for i = 1:size(folder_dir,1)
         % save data
         ht_data.h = thalweg_sample_ht;
         ht_data.t = time;
+        ht_data.x = sample_x;
         filename = [save_foldername, save_fileprefix, folder_dir(i).name,'.mat'];
         save(filename,'ht_data')
 

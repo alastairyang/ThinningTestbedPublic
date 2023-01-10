@@ -203,7 +203,7 @@ for j = 1:length(GLs) % iterate over grounding line depths
          subplot_title = strrep(modelname(1:end-4), '_',', ');
 
         % more compact illustration: 1 scatter plot
-        % get the linear fit to lag time - distance 
+        % get the linear fit to lag time w.r.t. distance 
         P = polyfit(distances/1000, min_dhdt_year - reversal_year, 1);
         slope = P(1); 
         % min, mean, max lag time
@@ -236,6 +236,9 @@ saveas(gcf, 'plots/mu_calve_timelag_scatter.pdf')
 
 %% functions
 function bool = compare_GLvalue(str, val)
+%   This function extracts the grounding line value from a model run
+%   filename and compares it to a supplied numerical value. It outputs a
+%   boolean value: if identical, it outputs 1
     filename_split = split(str, '_');
     initials = string(cellfun(@(s) s(1:2), filename_split, 'UniformOutput', false));
     GLvalue = filename_split(strcmp('GL', initials));
