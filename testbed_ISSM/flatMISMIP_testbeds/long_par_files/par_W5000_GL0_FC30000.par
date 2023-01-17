@@ -125,8 +125,6 @@ pos = find(md.mesh.x < 30000);
 md.smb.mass_balance(pos) = 0.5 / (30000) .* (30000 - md.mesh.x(pos));
 pos = find(md.mesh.x >= 30000);
 md.smb.mass_balance(pos) = 0.0 - (0.5 / (max(md.mesh.x)- 30000 )) .* (md.mesh.x(pos)-30000);
-%md.smb.mass_balance = 0.6 * ones(md.mesh.numberofvertices,1);
-%md.basalforcings.geothermalflux=0.5*ones(md.mesh.numberofvertices,1);
 ud.basalforcings.geothermalflux=0.05*ones(md.mesh.numberofvertices,1);
 md.basalforcings.groundedice_melting_rate=0.*ones(md.mesh.numberofvertices,1);
 md.basalforcings.floatingice_melting_rate=0.*ones(md.mesh.numberofvertices,1);
