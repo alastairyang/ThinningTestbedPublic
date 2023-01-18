@@ -1,4 +1,4 @@
-%% Compute the force balance
+% In this script, we analyze the force balance of two selected glaciers
 % we plot (in GIFs) the force balance of two models side by side
 md1_name = "model_W5000_GL0_FC120000";
 md2_name = "model_W5000_GL0_FC30000";

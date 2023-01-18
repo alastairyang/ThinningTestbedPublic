@@ -187,18 +187,6 @@ function [A0, decay_length] = gauss_perturb_analysis(perturb_ht, nopertb_ht, pos
     %plot_attenuation(decay_length, A0, dist_to_perturb, peaks_downstream)
 end
 
-function bool = compare_GLvalue(str, val)
-%   This function extracts the grounding line value from a model run
-%   filename and compares it to a supplied numerical value. It outputs a
-%   boolean value: if identical, it outputs 1
-    filename_split = split(str, '_');
-    initials = string(cellfun(@(s) s(1:2), filename_split, 'UniformOutput', false));
-    GLvalue = filename_split(strcmp('GL', initials));
-    GLvalue = str2double(GLvalue{1}(3:end));
-
-    bool = GLvalue == val;
-end
-
 function err = minimize_attenuation(v, A, x, data)
     beta = v(1); % decay length scale
     A_decay = A.*exp(-beta.*x);

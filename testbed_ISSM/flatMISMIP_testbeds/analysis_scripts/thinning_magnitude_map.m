@@ -1,0 +1,172 @@
+% This script makes a tiled plot of the thinning magnitude (h at the last
+% timestep minus initial h). It shows both delta H in the control run and
+% the delta (delta H) between the control and effective pressure feedback
+% experiment.
+
+glacier_length = 56500; % initial glacier length (x = 0 to calving front)
+length_to_keep = 20000; % 20 km behind the calving front to keep for the plots
+
+% model parameters and plot parameters
+% read in the model parameter table
+md_vars = readtable('md_var_combinations.csv');
+Ws = sort(unique(md_vars.('fjord_width')));
+GLs = sort(unique(md_vars.('delta_groundingline_depth')));
+FCs = sort(unique(md_vars.('background_friccoef')));
+
+% specify the scatter plot data symbols
+% GL: circle vs dot; FC: color, light to dark; W: size of the symbol
+Ws_symb = [40,80,110];
+GLs_symb = ["square","o"];
+FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
+
+ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+% get all model foldernames
+foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
+foldernames_tbl = struct2table(foldernames);
+bools = cellfun(@(s) ~strcmp(s(1),'.'), foldernames_tbl.name);
+foldernames_tbl = foldernames_tbl(bools,:);
+
+plot_idx = 0;
+
+ylabel_i = [1,4,7];
+xlabel_i = [7,8,9];
+
+% split the folder_dir into two groups, separated by grounding line depth
+folder_dir_groups = cell(1,2);
+for i = 1:length(GLs)
+    % skip the irrelevant ones
+    GL_bool = zeros(size(foldernames_tbl,1),1);
+    for j = 1:size(foldernames_tbl.name)
+        GL_bool(j) = compare_GLvalue(foldernames_tbl.name(j), GLs(i));
+    end
+    % save the respective folder items to a cell
+    folder_dir_groups{i} = foldernames_tbl(find(GL_bool),:); %#ok<FNDSB> 
+end
+
+%% Thinning magnitude visualization
+% we divide the dicussions by the grounding line depth
+[~, shallowGL_i] = min(GLs);
+[~, deeperGL_i]  = max(GLs);
+
+% shallower grounding line
+n_simu = size(folder_dir_groups{shallowGL_i}, 1);
+% initialize cells to save the map view data
+deltaH_ctrl = cell(n_simu, 2);
+deltaH_expt = cell(n_simu, 2);
+
+%% Control
+% Shallow grounding line
+for j = 1:n_simu
+    % read the model
+    group = folder_dir_groups{shallowGL_i};
+    ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
+    % plot the delta H
+    deltaH = ctrl.results.TransientSolution(end).Surface - ...
+             ctrl.results.TransientSolution(1).Surface;
+    % crop the extents
+    % keep: from calving front to 20 km behind
+    mask = ctrl.results.TransientSolution(end).MaskIceLevelset;
+    front_dist = locate_calvingfront(ctrl, mask);
+    upstream_dist = front_dist - length_to_keep;
+    [grid_deltaH, x, y] = mesh_to_grid(ctrl.mesh.elements, ctrl.mesh.x, ctrl.mesh.y, deltaH, 50);
+    x_crop = x(x < front_dist & x > upstream_dist);
+    grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
+
+    % save to the cells
+    deltaH_ctrl{j, shallowGL_i} = grid_deltaH_crop;
+end
+
+% deeper grounding line
+n_simu = size(folder_dir_groups{deeperGL_i}, 1);
+for j = 1:n_simu
+    % read the model
+    group = folder_dir_groups{deeperGL_i};
+    ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
+    % plot the delta H
+    deltaH = ctrl.results.TransientSolution(end).Surface - ...
+             ctrl.results.TransientSolution(1).Surface;
+    % crop the extents
+    % keep: from calving front to 20 km behind
+    mask = ctrl.results.TransientSolution(end).MaskIceLevelset;
+    front_dist = locate_calvingfront(ctrl, mask);
+    upstream_dist = front_dist - length_to_keep;
+    [grid_deltaH, x, y] = mesh_to_grid(ctrl.mesh.elements, ctrl.mesh.x, ctrl.mesh.y, deltaH, 50);
+    x_crop = x(x < front_dist & x > upstream_dist);
+    grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
+
+    % save to the cells
+    deltaH_ctrl{j, deeperGL_i} = grid_deltaH_crop;
+end
+
+%% Experiment (effective pressure feedback)
+% Shallow grounding line
+for j = 1:n_simu
+    % read the model
+    group = folder_dir_groups{shallowGL_i};
+    expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
+    % plot the delta H
+    deltaH = expt.results.TransientSolution(end).Surface - ...
+             expt.results.TransientSolution(1).Surface;
+    % crop the extents
+    % keep: from calving front to 20 km behind
+    mask = expt.results.TransientSolution(end).MaskIceLevelset;
+    front_dist = locate_calvingfront(expt, mask);
+    upstream_dist = front_dist - length_to_keep;
+    [grid_deltaH, x, y] = mesh_to_grid(expt.mesh.elements, expt.mesh.x, expt.mesh.y, deltaH, 50);
+    x_crop = x(x < front_dist & x > upstream_dist);
+    grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
+
+    % save to the cells
+    deltaH_expt{j, shallowGL_i} = grid_deltaH_crop;
+end
+
+% deeper grounding line
+n_simu = size(folder_dir_groups{deeperGL_i}, 1);
+for j = 1:n_simu
+    % read the model
+    group = folder_dir_groups{deeperGL_i};
+    expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
+    % plot the delta H
+    deltaH = expt.results.TransientSolution(end).Surface - ...
+             expt.results.TransientSolution(1).Surface;
+    % crop the extents
+    % keep: from calving front to 20 km behind
+    mask = expt.results.TransientSolution(end).MaskIceLevelset;
+    front_dist = locate_calvingfront(expt, mask);
+    upstream_dist = front_dist - length_to_keep;
+    [grid_deltaH, x, y] = mesh_to_grid(expt.mesh.elements, expt.mesh.x, expt.mesh.y, deltaH, 50);
+    x_crop = x(x < front_dist & x > upstream_dist);
+    grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
+
+    % save to the cells
+    deltaH_expt{j, deeperGL_i} = grid_deltaH_crop;
+end
+
+%% Make tiled plots
+
+figure('Position',[200,200,500,500]);
+h = tiledlayout(3,3, 'TileSpacing', 'none', 'Padding', 'none');
+for j = 1:n_simu
+    nexttile
+    imagesc(deltaH_expt{j,shallowGL_i} - deltaH_ctrl{j,shallowGL_i});
+    colormap("pink")
+    clim([-300,0])
+    set(gca, 'xtick', [])
+    set(gca, 'ytick', [])
+end
+cb = colorbar;
+cb.Layout.Tile = 'east';
+
+figure('Position',[800,200,500,500]);
+h = tiledlayout(3,3, 'TileSpacing', 'none', 'Padding', 'none');
+for j = 1:n_simu
+    nexttile
+    imagesc(deltaH_expt{j,deeperGL_i} - deltaH_ctrl{j,deeperGL_i});
+    colormap("pink")
+    clim([-350,0])
+    set(gca, 'xtick', [])
+    set(gca, 'ytick', [])
+end
+cb = colorbar;
+cb.Layout.Tile = 'east';
