@@ -50,9 +50,12 @@ dict.calving_mu_gp3.save_fileprefix = 'ht_gp3_mu_calve_';
 dict.calving_mu_gp4.modelname = 'MISMIP_yangTransient_Calving_MassUnloading_GaussianPerturb_4.mat';
 dict.calving_mu_gp4.save_foldername = 'analyzed_data/gp4_mu_calve';
 dict.calving_mu_gp4.save_fileprefix = 'ht_gp4_mu_calve_';
-%% save __ data from model outputs into .mat
+%% save data from model outputs into .mat
+% here we are saving 1. the sampled control point distance from the inflow
+% boundary, 2. the time axis, and 3. the thickness at the sampled control
+% points
 % specify the experiment that you want to extract data from
-mddict = dict.calving_gp4;
+mddict = dict.calving_mu;
 
 modelname_calving = mddict.modelname;
 save_foldername  = mddict.save_foldername;
@@ -71,9 +74,21 @@ for i = 1:size(folder_dir,1)
     else
         md_count = md_count + 1;
         fullname = [folder_dir(i).name '/' modelname_calving];
+        % load the ISSM model
         calve_md = load([folder_dir(i).folder '/' fullname]).md;
         nt = size(calve_md.results.TransientSolution,2);
 
+        % Get the grounding line and calving front location sequence
+        gl_locs = zeros(1,nt);
+        front_locs = zeros(1,nt);
+        for k = 1:nt
+            front_mask = calve_md.results.TransientSolution(k).MaskIceLevelset;
+            gl_mask = calve_md.results.TransientSolution(k).MaskOceanLevelset;
+            front_locs(k) = locate_calvingfront(calve_md, front_mask);
+            gl_locs(k) = locate_groundingline(calve_md, gl_mask);
+        end
+        
+        % Get the thickness, control point location, and time axis
         % geometry parameters
         Lx = max(calve_md.mesh.x);
         Ly = max(calve_md.mesh.y);
@@ -134,6 +149,8 @@ for i = 1:size(folder_dir,1)
         ht_data.h = thalweg_sample_ht;
         ht_data.t = time;
         ht_data.x = sample_x;
+        ht_data.gl = gl_locs;
+        ht_data.front = front_locs;
         filename = [save_foldername, save_fileprefix, folder_dir(i).name,'.mat'];
         save(filename,'ht_data')
 

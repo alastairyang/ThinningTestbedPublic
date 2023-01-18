@@ -42,8 +42,11 @@ Ws_symb = [40,80,110];
 GLs_symb = ["square","o"];
 FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
 
-%% For control group
+% preallocate
+expt_folder_dir_groups = cell(1,2);
 ctrl_folder_dir_groups = cell(1,2);
+
+% control
 % split the folder_dir into two groups, separated by grounding line depth
 for i = 1:length(GLs)
     % skip the irrelevant ones
@@ -55,13 +58,27 @@ for i = 1:length(GLs)
     ctrl_folder_dir_groups{i} = ctrl_folder_dir(find(GL_bool),:); %#ok<FNDSB> 
 
 end
+% experiment
+% split the folder_dir into two groups, separated by grounding line depth
+for i = 1:length(GLs)
+    % skip the irrelevant ones
+    GL_bool = zeros(size(expt_folder_dir,1),1);
+    for j = 1:size(expt_folder_dir.name)
+        GL_bool(j) = compare_GLvalue(expt_folder_dir.name(j), GLs(i));
+    end
+    % save the respective folder items to a cell
+    expt_folder_dir_groups{i} = expt_folder_dir(find(GL_bool),:); %#ok<FNDSB> 
 
+end
 
-figure('Position',[100,100,500,500]);
+%% For control group
+h = tiledlayout(2,1, 'TileSpacing','none','Padding','none');
+%figure('Position',[100,100,500,500]);
 for j = 1:length(GLs) % iterate over grounding line depths
     ctrl_folder_dir = ctrl_folder_dir_groups{j};
     md_count = 0;
 
+    nexttile
     for i = 1:size(ctrl_folder_dir,1)
         md_count = md_count + 1;
 
@@ -87,24 +104,22 @@ for j = 1:length(GLs) % iterate over grounding line depths
         % find the lag year to calving front reversal
         [min_dhdt, min_dhdt_i] = min(dhdt,[], 1);
         min_dhdt_year = md.t(min_dhdt_i);
-        % find the travel time (min dhdt year - reversal year)
-        travel_time = min_dhdt_year - min_dhdt_year(1);
+        travel_time = min_dhdt_year;
         % create along flowline sampling distance
-        % here we define the distance as to the first sampled point
+        % here we define the distance as to the first kept sampled point
         % (closest to the terminus)
-        distances = (1:sample_number)*sample_interval/1000;
-        wave_vel = (distances)./travel_time; % km/yr
-        % plot the year lag
-        % we can choose to skip the first few sample points by specifying%
-        % start_i bigger than 1
-        start_i = 1;
-        distances = distances(start_i:end);
-        travel_time = travel_time(start_i:end);
-        if j == length(GLs)
-            legend(["GL = "+string(num2str(GLs(1))), "GL = "+string(num2str(GLs(2)))]);
-        end
-        hold on
-        subplot_title = strrep(modelname(1:end-4), '_',', ');
+        distances = (md.x(1) - md.x)/1000; 
+
+        % skip the control points that are on the floating section at the
+        % end of the simulation
+        distances = distances(~(md.x > (md.gl(end)-1500)));
+        travel_time = travel_time(~(md.x > (md.gl(end)-1500)));
+        travel_time = travel_time - travel_time(1);
+%         if j == length(GLs)
+%             legend(["GL = "+string(num2str(GLs(1))), "GL = "+string(num2str(GLs(2)))]);
+%         end
+%         hold on
+%         subplot_title = strrep(modelname(1:end-4), '_',', ');
 
         % more compact illustration: 1 scatter plot
         % get the linear fit to lag time - distance 
@@ -118,39 +133,33 @@ for j = 1:length(GLs) % iterate over grounding line depths
         GL_symb = GLs_symb(GL==GLs);
         FC_symb = FCs_symb(FC==FCs,:);
         % plot both the scatter and the linear fit
-        scp1 = scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
+        scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
         hold on
-        plot(distances_forplot, travel_time_md, '-.'); hold off
-
+        plot(distances_forplot, travel_time_md, '-.k'); 
+        xlim([0,20])
+        ylim([0,8])
+        alpha(0.7)
     end
-    ylabel('$\tilde{\tau}$ (yr)','Interpreter','latex','FontSize',16)
-    xlabel('Along flow distance $x$ (km)','Interpreter','latex','FontSize',16)
-
+    ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
+    xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
+    % create fititious legends
+    s1 = scatter(nan,nan, Ws_symb(1), 'k',GLs_symb(j)); hold on;
+    s2 = scatter(nan,nan, Ws_symb(2), 'k',GLs_symb(j)); hold on;
+    s3 = scatter(nan,nan, Ws_symb(3), 'k',GLs_symb(j)); hold on;
+%     symb_names = {'narrow','standard','wide'};
+%     [~, objh] = legend([s1 s2 s3], symb_names,'FontSize',12,'Box','off','Interpreter','latex','Location','northwest');
+%     objhl = findobj(objh, 'type','scatter');
+    %set(objhl, 'Markersize', Ws_symb(jj))
 end
-% add made-up legends
-% S1 = scatter(nan,nan,10,'k','o');
-% S2 = scatter(nan,nan,10,'k','square');
-% legend([S1 S2],{'Shallow','Deep'},'FontSize',12,'Box','off','Interpreter','latex')
-
+exportgraphics(gcf,'plots/ctrl_travel_time.pdf','ContentType','vector')
 %% For experiment
-expt_folder_dir_groups = cell(1,2);
-% split the folder_dir into two groups, separated by grounding line depth
-for i = 1:length(GLs)
-    % skip the irrelevant ones
-    GL_bool = zeros(size(expt_folder_dir,1),1);
-    for j = 1:size(expt_folder_dir.name)
-        GL_bool(j) = compare_GLvalue(expt_folder_dir.name(j), GLs(i));
-    end
-    % save the respective folder items to a cell
-    expt_folder_dir_groups{i} = expt_folder_dir(find(GL_bool),:); %#ok<FNDSB> 
-
-end
-
-figure('Position',[100,100,500,500]);
+h = tiledlayout(2,1, 'TileSpacing','none','Padding','none');
+%figure('Position',[100,100,500,500]);
 for j = 1:length(GLs) % iterate over grounding line depths
     expt_folder_dir = expt_folder_dir_groups{j};
     md_count = 0;
 
+    nexttile
     for i = 1:size(expt_folder_dir,1)
         md_count = md_count + 1;
 
@@ -176,24 +185,22 @@ for j = 1:length(GLs) % iterate over grounding line depths
         % find the lag year to calving front reversal
         [min_dhdt, min_dhdt_i] = min(dhdt,[], 1);
         min_dhdt_year = md.t(min_dhdt_i);
-        % find the travel time (min dhdt year - reversal year)
-        travel_time = min_dhdt_year - min_dhdt_year(1);
+        travel_time = min_dhdt_year;
         % create along flowline sampling distance
-        % here we define the distance as to the first sampled point
+        % here we define the distance as to the first kept sampled point
         % (closest to the terminus)
-        distances = (1:sample_number)*sample_interval/1000;
-        wave_vel = (distances)./travel_time; % km/yr
-        % plot the year lag
-        % we can choose to skip the first few sample points by specifying%
-        % start_i bigger than 1
-        start_i = 1;
-        distances = distances(start_i:end);
-        travel_time = travel_time(start_i:end);
-        if j == length(GLs)
-            legend(["GL = "+string(num2str(GLs(1))), "GL = "+string(num2str(GLs(2)))]);
-        end
-        hold on
-        subplot_title = strrep(modelname(1:end-4), '_',', ');
+        distances = (md.x(1) - md.x)/1000; 
+
+        % skip the control points that are on the floating section at the
+        % end of the simulation
+        distances = distances(~(md.x > (md.gl(end)-1500)));
+        travel_time = travel_time(~(md.x > (md.gl(end)-1500)));
+        travel_time = travel_time - travel_time(1);
+%         if j == length(GLs)
+%             legend(["GL = "+string(num2str(GLs(1))), "GL = "+string(num2str(GLs(2)))]);
+%         end
+%         hold on
+%         subplot_title = strrep(modelname(1:end-4), '_',', ');
 
         % more compact illustration: 1 scatter plot
         % get the linear fit to lag time - distance 
@@ -207,18 +214,27 @@ for j = 1:length(GLs) % iterate over grounding line depths
         GL_symb = GLs_symb(GL==GLs);
         FC_symb = FCs_symb(FC==FCs,:);
         % plot both the scatter and the linear fit
-        scp1 = scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
+        scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
         hold on
-        plot(distances_forplot, travel_time_md, '-.'); hold off
-
+        plot(distances_forplot, travel_time_md, '-.k'); 
+        xlim([0,20])
+        ylim([0,8])
+        alpha(0.7)
     end
-    ylabel('$\tilde{\tau}$ (yr)','Interpreter','latex','FontSize',16)
-    xlabel('Along flow distance $x$ (km)','Interpreter','latex','FontSize',16)
-
+    ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
+    xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
+    % create fititious legends
+    s1 = scatter(nan,nan, Ws_symb(1), 'k',GLs_symb(j)); hold on;
+    s2 = scatter(nan,nan, Ws_symb(2), 'k',GLs_symb(j)); hold on;
+    s3 = scatter(nan,nan, Ws_symb(3), 'k',GLs_symb(j)); hold on;
+%     symb_names = {'narrow','standard','wide'};
+%     [~, objh] = legend([s1 s2 s3], symb_names,'FontSize',12,'Box','off','Interpreter','latex','Location','northwest');
+%     objhl = findobj(objh, 'type','scatter');
+    %set(objhl, 'Markersize', Ws_symb(jj))
 end
+exportgraphics(gcf,'plots/mu_travel_time.pdf','ContentType','vector')
 
 %% save to folder
 saveas(gcf, 'plots/calve_timelag_scatter.pdf')
 
 % set all the data in the previous plot more transparent
-alpha(0.2)
