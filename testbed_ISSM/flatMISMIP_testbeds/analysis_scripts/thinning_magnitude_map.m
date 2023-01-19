@@ -3,6 +3,10 @@
 % the delta (delta H) between the control and effective pressure feedback
 % experiment.
 
+% Warning: this script is quite a mess...when making changes, making sure
+% to be clear about control (ctrl), experiment (exp), shallow, and deeper
+% grounding line models
+
 glacier_length = 56500; % initial glacier length (x = 0 to calving front)
 length_to_keep = 20000; % 20 km behind the calving front to keep for the plots
 
@@ -44,7 +48,6 @@ for i = 1:length(GLs)
     folder_dir_groups{i} = foldernames_tbl(find(GL_bool),:); %#ok<FNDSB> 
 end
 
-%% Thinning magnitude visualization
 % we divide the dicussions by the grounding line depth
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
@@ -54,6 +57,8 @@ n_simu = size(folder_dir_groups{shallowGL_i}, 1);
 % initialize cells to save the map view data
 deltaH_ctrl = cell(n_simu, 2);
 deltaH_expt = cell(n_simu, 2);
+gl_cells_ctrl = cell(n_simu,2);
+gl_cells_expt = cell(n_simu,2);
 
 %% Control
 % Shallow grounding line
@@ -73,8 +78,24 @@ for j = 1:n_simu
     x_crop = x(x < front_dist & x > upstream_dist);
     grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
 
+    % save some grounding line positions (sample every other year)
+    sampled_t_i = 1:20:size(ctrl.results.TransientSolution,2);
+    results_tbl = struct2table(ctrl.results.TransientSolution);
+    sampled_t = results_tbl.time(sampled_t_i);
+    gl_masks  = results_tbl.MaskOceanLevelset(sampled_t_i);
+    % get the x,y of the grounding line from each mask
+    xs = [];
+    ys = [];
+    all_gls = cell(1,length(gl_masks));
+    for jj = 1:length(gl_masks)
+        all_gls{jj} = isoline(ctrl, gl_masks{jj}, 'value', 0);
+    end
+    gl_cells_ctrl{j,shallowGL_i}.data = all_gls;
+    gl_cells_ctrl{j,shallowGL_i}.t = sampled_t(jj);
     % save to the cells
-    deltaH_ctrl{j, shallowGL_i} = grid_deltaH_crop;
+    deltaH_ctrl{j, shallowGL_i}.data = grid_deltaH_crop;
+    deltaH_ctrl{j, shallowGL_i}.x = x_crop;
+    deltaH_ctrl{j, shallowGL_i}.y = y;
 end
 
 % deeper grounding line
@@ -95,8 +116,25 @@ for j = 1:n_simu
     x_crop = x(x < front_dist & x > upstream_dist);
     grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
 
+    % save some grounding line positions (sample every other year)
+    sampled_t_i = 1:20:size(ctrl.results.TransientSolution,2);
+    results_tbl = struct2table(ctrl.results.TransientSolution);
+    sampled_t = results_tbl.time(sampled_t_i);
+    gl_masks  = results_tbl.MaskOceanLevelset(sampled_t_i);
+    % get the x,y of the grounding line from each mask
+    xs = [];
+    ys = [];
+    all_gls = cell(1,length(gl_masks));
+    for jj = 1:length(gl_masks)
+        all_gls{jj} = isoline(ctrl, gl_masks{jj}, 'value', 0);
+    end
+    gl_cells_ctrl{j,deeperGL_i}.data = all_gls;
+    gl_cells_ctrl{j,deeperGL_i}.t = sampled_t(jj);
+
     % save to the cells
-    deltaH_ctrl{j, deeperGL_i} = grid_deltaH_crop;
+    deltaH_ctrl{j, deeperGL_i}.data = grid_deltaH_crop;
+    deltaH_ctrl{j, deeperGL_i}.x = x_crop;
+    deltaH_ctrl{j, deeperGL_i}.y = y;
 end
 
 %% Experiment (effective pressure feedback)
@@ -117,8 +155,25 @@ for j = 1:n_simu
     x_crop = x(x < front_dist & x > upstream_dist);
     grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
 
+    % save some grounding line positions (sample every other year)
+    sampled_t_i = 1:20:size(expt.results.TransientSolution,2);
+    results_tbl = struct2table(expt.results.TransientSolution);
+    sampled_t = results_tbl.time(sampled_t_i);
+    gl_masks  = results_tbl.MaskOceanLevelset(sampled_t_i);
+    % get the x,y of the grounding line from each mask
+    xs = [];
+    ys = [];
+    all_gls = cell(1,length(gl_masks));
+    for jj = 1:length(gl_masks)
+        all_gls{jj} = isoline(expt, gl_masks{jj}, 'value', 0);
+    end
+    gl_cells_expt{j,shallowGL_i}.data = all_gls;
+    gl_cells_expt{j,shallowGL_i}.t = sampled_t(jj);
+
     % save to the cells
-    deltaH_expt{j, shallowGL_i} = grid_deltaH_crop;
+    deltaH_expt{j, shallowGL_i}.data = grid_deltaH_crop;
+    deltaH_expt{j, shallowGL_i}.x = x_crop;
+    deltaH_expt{j, shallowGL_i}.y = y;
 end
 
 % deeper grounding line
@@ -139,8 +194,25 @@ for j = 1:n_simu
     x_crop = x(x < front_dist & x > upstream_dist);
     grid_deltaH_crop = grid_deltaH(:, x < front_dist & x > upstream_dist);
 
+    % save some grounding line positions (sample every other year)
+    sampled_t_i = 1:20:size(expt.results.TransientSolution,2);
+    results_tbl = struct2table(expt.results.TransientSolution);
+    sampled_t = results_tbl.time(sampled_t_i);
+    gl_masks  = results_tbl.MaskOceanLevelset(sampled_t_i);
+    % get the x,y of the grounding line from each mask
+    xs = [];
+    ys = [];
+    all_gls = cell(1,length(gl_masks));
+    for jj = 1:length(gl_masks)
+        all_gls{jj} = isoline(expt, gl_masks{jj}, 'value', 0);
+    end
+    gl_cells_expt{j,deeperGL_i}.data = all_gls;
+    gl_cells_expt{j,deeperGL_i}.t = sampled_t(jj);
+
     % save to the cells
-    deltaH_expt{j, deeperGL_i} = grid_deltaH_crop;
+    deltaH_expt{j, deeperGL_i}.data = grid_deltaH_crop;
+    deltaH_expt{j, deeperGL_i}.x = x_crop;
+    deltaH_expt{j, deeperGL_i}.y = y;
 end
 
 %% Make tiled plots
@@ -149,24 +221,48 @@ figure('Position',[200,200,500,500]);
 h = tiledlayout(3,3, 'TileSpacing', 'none', 'Padding', 'none');
 for j = 1:n_simu
     nexttile
-    imagesc(deltaH_expt{j,shallowGL_i} - deltaH_ctrl{j,shallowGL_i});
+    imagesc(deltaH_expt{j,shallowGL_i}.x, deltaH_expt{j,shallowGL_i}.y,...
+            deltaH_expt{j,shallowGL_i}.data - deltaH_ctrl{j,shallowGL_i}.data);
     colormap("pink")
     clim([-300,0])
+    hold on
+    % select the data for this glacier
+    gl_data = gl_cells_expt{j,shallowGL_i};
+    for k = 1:length(gl_data.data)
+        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 5,'filled',... ...
+                'MarkerFaceAlpha',0.3,'MarkerEdgeAlpha',0.3);
+        hold on
+    end
+    colororder(cool(length(gl_data.data)))
     set(gca, 'xtick', [])
     set(gca, 'ytick', [])
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
+exportgraphics(gcf,'plots/dH_from_feedback_shallowGL.pdf')
 
+%%
 figure('Position',[800,200,500,500]);
 h = tiledlayout(3,3, 'TileSpacing', 'none', 'Padding', 'none');
 for j = 1:n_simu
     nexttile
-    imagesc(deltaH_expt{j,deeperGL_i} - deltaH_ctrl{j,deeperGL_i});
+    imagesc(deltaH_expt{j,deeperGL_i}.x, deltaH_expt{j,deeperGL_i}.y,...
+            deltaH_expt{j,deeperGL_i}.data - deltaH_ctrl{j,deeperGL_i}.data);
     colormap("pink")
     clim([-350,0])
+    hold on;
+    % select the data for this glacier
+    gl_data = gl_cells_expt{j,deeperGL_i};
+    for k = 1:length(gl_data.data)
+        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 5,'filled',... ...
+                'MarkerFaceAlpha',0.3,'MarkerEdgeAlpha',0.3);
+        hold on
+    end
+    colororder(cool(length(gl_data.data)))
     set(gca, 'xtick', [])
     set(gca, 'ytick', [])
+
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
+exportgraphics(gcf,'plots/dH_from_feedback_deepGL.pdf')
