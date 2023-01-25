@@ -54,7 +54,7 @@ end
 
 % shallower grounding line
 n_simu = size(folder_dir_groups{shallowGL_i}, 1);
-% initialize cells to save the map view data
+% pre-allocate
 deltaH_ctrl = cell(n_simu, 2);
 deltaH_expt = cell(n_simu, 2);
 gl_cells_ctrl = cell(n_simu,2);
