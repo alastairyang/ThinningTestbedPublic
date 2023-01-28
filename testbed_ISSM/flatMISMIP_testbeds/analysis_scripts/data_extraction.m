@@ -25,6 +25,27 @@ dict.calving_mu.modelname = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
 dict.calving_mu.save_foldername = 'analyzed_data/mu_calve/';
 dict.calving_mu.save_fileprefix = 'ht_mu_calve_';
 
+% Mass unloading + localized basal perturbation: transient pulse
+dict.calving_mu_pulse8.modelname = 'MISMIP_yangTransient_Calving_MassUnloading_PulseGaussianPerturb_8.mat';
+dict.calving_mu_pulse8.save_foldername = 'analyzed_data/mu_pulse_calve/';
+dict.calving_mu_pulse8.save_fileprefix = 'ht_mu_pulse_calve_';
+
+% Mass unloading + localized basal perturbation: diffused pulse
+dict.calving_mu_diffu8.modelname = 'MISMIP_yangTransient_Calving_MassUnloading_DiffuGaussianPerturb_8.mat';
+dict.calving_mu_diffu8.save_foldername = 'analyzed_data/mu_diffu_calve/';
+dict.calving_mu_diffu8.save_fileprefix = 'ht_mu_diffu_calve_';
+
+% localized basal perturbation: transient pulse
+dict.calving_pulse8.modelname = 'MISMIP_yangTransient_Calving_PulseGaussianPerturb_8.mat';
+dict.calving_pulse8.save_foldername = 'analyzed_data/pulse_calve/';
+dict.calving_pulse8.save_fileprefix = 'ht_pulse_calve_';
+
+% localized basal perturbation: diffused pulse
+dict.calving_diffu8.modelname = 'MISMIP_yangTransient_Calving_DiffuGaussianPerturb_8.mat';
+dict.calving_diffu8.save_foldername = 'analyzed_data/diffu_calve/';
+dict.calving_diffu8.save_fileprefix = 'ht_diffu_calve_';
+
+% Old experiment; localized perturbation
 dict.calving_gp1.modelname = 'MISMIP_yangTransient_Calving_GaussianPerturb_1.mat';
 dict.calving_gp1.save_foldername = 'analyzed_data/gp1_calve/';
 dict.calving_gp1.save_fileprefix = 'ht_gp1_calve_';
@@ -55,7 +76,7 @@ dict.calving_mu_gp4.save_fileprefix = 'ht_gp4_mu_calve_';
 % boundary, 2. the time axis, and 3. the thickness at the sampled control
 % points
 % specify the experiment that you want to extract data from
-mddict = dict.calving_mu;
+mddict = dict.calving_mu_pulse8;
 
 modelname_calving = mddict.modelname;
 save_foldername  = mddict.save_foldername;

@@ -45,7 +45,7 @@ tic
 % start iteration
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
-for jj = 13%md_idx
+for jj = md_idx
 
     var_table = mdvar_combs(jj,:);
 
@@ -66,7 +66,7 @@ for jj = 13%md_idx
     end
 
     % RUN
-    for steps = 12
+    for steps = 9:10
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);

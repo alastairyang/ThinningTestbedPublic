@@ -72,7 +72,7 @@ for i = 1:length(GLs)
 end
 
 %% For control group
-h = tiledlayout(2,1, 'TileSpacing','none','Padding','none');
+tiledlayout(2,1, 'TileSpacing','none','Padding','none');
 %figure('Position',[100,100,500,500]);
 for j = 1:length(GLs) % iterate over grounding line depths
     ctrl_folder_dir = ctrl_folder_dir_groups{j};
@@ -142,18 +142,12 @@ for j = 1:length(GLs) % iterate over grounding line depths
     end
     ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
     xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
-    % create fititious legends
-    s1 = scatter(nan,nan, Ws_symb(1), 'k',GLs_symb(j)); hold on;
-    s2 = scatter(nan,nan, Ws_symb(2), 'k',GLs_symb(j)); hold on;
-    s3 = scatter(nan,nan, Ws_symb(3), 'k',GLs_symb(j)); hold on;
-%     symb_names = {'narrow','standard','wide'};
-%     [~, objh] = legend([s1 s2 s3], symb_names,'FontSize',12,'Box','off','Interpreter','latex','Location','northwest');
-%     objhl = findobj(objh, 'type','scatter');
-    %set(objhl, 'Markersize', Ws_symb(jj))
 end
 exportgraphics(gcf,'plots/ctrl_travel_time.pdf','ContentType','vector')
 %% For experiment
-h = tiledlayout(2,1, 'TileSpacing','none','Padding','none');
+tiledlayout(2,1, 'TileSpacing','none','Padding','none');
+hCopys = []; % storing the scatter elements
+kin_wave_vels = zeros(length(GLs)*size(expt_folder_dir,1), 4); % 4 columns: width, depth, coef, slope
 %figure('Position',[100,100,500,500]);
 for j = 1:length(GLs) % iterate over grounding line depths
     expt_folder_dir = expt_folder_dir_groups{j};
@@ -214,27 +208,62 @@ for j = 1:length(GLs) % iterate over grounding line depths
         GL_symb = GLs_symb(GL==GLs);
         FC_symb = FCs_symb(FC==FCs,:);
         % plot both the scatter and the linear fit
-        scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
+        ax = gca;
+        %h = scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
+        h = plot(distances, travel_time, 'Color',FC_symb, 'Marker','.','MarkerSize',W_symb*0.4,'LineStyle','none');
         hold on
         plot(distances_forplot, travel_time_md, '-.k'); 
         xlim([0,20])
         ylim([0,8])
         alpha(0.7)
+        % add the legend with customized marker size 
+        hCopy = copyobj(h, ax); 
+        set(hCopy,'XData', NaN', 'YData', NaN);
+        hCopy.MarkerSize = W_symb*0.15;
+        hCopys = [hCopys, hCopy];
+
+        % save the slopes (wave velocity) along with model parameters
+        % to a table
+        % first convert subscript indexing to linear indexing
+        
+        id = sub2ind([length(GLs), size(expt_folder_dir,1)], j, i);
+        kin_wave_vels(id,1) = W;
+        kin_wave_vels(id,2) = GL;
+        kin_wave_vels(id,3) = FC;
+        true_slope = polyfit(travel_time, distances, 1);
+        kin_wave_vels(id,4) = true_slope(1);
+
     end
     ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
     xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
-    % create fititious legends
-    s1 = scatter(nan,nan, Ws_symb(1), 'k',GLs_symb(j)); hold on;
-    s2 = scatter(nan,nan, Ws_symb(2), 'k',GLs_symb(j)); hold on;
-    s3 = scatter(nan,nan, Ws_symb(3), 'k',GLs_symb(j)); hold on;
-%     symb_names = {'narrow','standard','wide'};
-%     [~, objh] = legend([s1 s2 s3], symb_names,'FontSize',12,'Box','off','Interpreter','latex','Location','northwest');
-%     objhl = findobj(objh, 'type','scatter');
-    %set(objhl, 'Markersize', Ws_symb(jj))
 end
 exportgraphics(gcf,'plots/mu_travel_time.pdf','ContentType','vector')
 
+% make the kinematic wave estimate a table and export to a spreedsheet
+kin_wave_vels = array2table(kin_wave_vels, 'VariableNames',["Width","Depth","Coefficient","KW Velocity (km/a)"]);
+writetable(kin_wave_vels,'result_tables/kinematic_wave_estimate_control.csv')
 %% save to folder
 saveas(gcf, 'plots/calve_timelag_scatter.pdf')
 
-% set all the data in the previous plot more transparent
+%% 
+
+% Create the plot
+ax = axes(); 
+hold on
+h(1) = plot(linspace(1,5,25), rand(1,25), 'ro', 'DisplayName', 'foo');
+h(2) = plot(1:5, rand(1,5), 'bo', 'DisplayName', 'bar');
+% copy the objects
+hCopy = copyobj(h, ax); 
+% replace coordinates with NaN 
+% Either all XData or all YData or both should be NaN.
+set(hCopy(1),'XData', NaN', 'YData', NaN)
+set(hCopy(2),'XData', NaN', 'YData', NaN)
+% Note, these lines can be combined: set(hCopy,'XData', NaN', 'YData', NaN)
+% To avoid "Data lengths must match" warning, assuming hCopy is a handle array, 
+% use arrayfun(@(h)set(h,'XData',nan(size(h.XData))),hCopy)
+% Alter the graphics properties
+hCopy(1).MarkerSize = 30; 
+hCopy(1).LineWidth = 2;
+hCopy(2).MarkerSize = 3; 
+% Create legend using copied objects
+legend(hCopy)
