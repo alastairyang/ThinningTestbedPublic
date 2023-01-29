@@ -5,50 +5,70 @@
 % 
 % We start by looking at just one model, the one that has the most thinning
 % from effective pressure
+
+%% load a selected model from the experiment (mass unloading) 
+md_type = 'expt';
 md_dir = 'long_models_yang/model_W11000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat';
 load(md_dir)
-% load front data 
+% load front data; variable name is ht_data
 load('analyzed_data/mu_calve/ht_mu_calve_model_W11000_GL400_FC120000');
 
-% put thickness change over time into one big matrix
-result_tbl = struct2table(md.results.TransientSolution);
-n_time = size(result_tbl,1);
-h_mat = [];
-for i = 1:n_time
-    h_mat = [h_mat; transpose(cell2mat(result_tbl.Thickness(i)))];
+[front_corr_expt, gl_corr_expt] = gl_front_corr(md, ht_data, md_type);
+
+%% load a selected model from the control
+md_type = 'ctrl';
+md_dir = 'long_models_yang/model_W11000_GL400_FC120000/MISMIP_yangTransient_CalvingOnly.mat';
+load(md_dir)
+% load front data; variable name is ht_data
+load('analyzed_data/calve_only/ht_calve_model_W11000_GL400_FC120000');
+
+[front_corr_ctrl, gl_corr_ctrl] = gl_front_corr(md, ht_data, md_type);
+
+%% APPENDIX: functions
+function [front_corr, gl_corr] = gl_front_corr(md, ht_data, md_type)
+    
+    % put thickness change over time into one big matrix
+    result_tbl = struct2table(md.results.TransientSolution);
+    n_time = size(result_tbl,1);
+    h_mat = [];
+    for i = 1:n_time
+        h_mat = [h_mat; transpose(cell2mat(result_tbl.Thickness(i)))];
+    end
+    % correlation
+    gl_corr = zeros(md.mesh.numberofvertices, 1);
+    front_corr = zeros(md.mesh.numberofvertices, 1);
+    for j = 1:md.mesh.numberofvertices
+        coefs = corrcoef(ht_data.gl', h_mat(:,j));
+        gl_corr(j) = coefs(1,2);
+        coefs = corrcoef(ht_data.front', h_mat(:,j));
+        front_corr(j) = coefs(1,2);
+    end
+    % crop the data: keep the grounded ice
+    [gl_corr_grid, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, gl_corr, 50);
+    [front_corr_grid, x, y] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, front_corr, 50);
+    mask = md.results.TransientSolution(end).MaskOceanLevelset;
+    gl_dist = locate_groundingline(md, mask);
+    % crop
+    x_crop = x(x < gl_dist);
+    gl_corr_grid = gl_corr_grid(:, x < gl_dist);
+    front_corr_grid = front_corr_grid(:, x < gl_dist);
+    
+    % plot
+    figure;
+    tiledlayout(2,1,'TileSpacing','none','Padding','none')
+    nexttile % calving front correlation
+    imagesc(x_crop, y, front_corr_grid); colormap copper; clim([0.7,1])
+    nexttile % grounding line correlation
+    imagesc(x_crop, y, gl_corr_grid); colormap copper; clim([0.7,1])
+    cb = colorbar;
+    cb.Layout.Tile = 'east';
+    % save
+    plot_name = ['temporal_correlation_',md_type,'.png'];
+    exportgraphics(gcf, ['plots/', plot_name],'Resolution',300)
+   
 end
-% correlation
-gl_corr = zeros(md.mesh.numberofvertices, 1);
-front_corr = zeros(md.mesh.numberofvertices, 1);
-for j = 1:md.mesh.numberofvertices
-    coefs = corrcoef(ht_data.gl', h_mat(:,j));
-    gl_corr(j) = coefs(1,2);
-    coefs = corrcoef(ht_data.front', h_mat(:,j));
-    front_corr(j) = coefs(1,2);
-end
-% crop the data: keep the grounded ice
-[gl_corr_grid, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, gl_corr, 50);
-[front_corr_grid, x, y] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, front_corr, 50);
-mask = md.results.TransientSolution(end).MaskOceanLevelset;
-gl_dist = locate_groundingline(md, mask);
-% crop
-x_crop = x(x < gl_dist);
-gl_corr_grid = gl_corr_grid(:, x < gl_dist);
-front_corr_grid = front_corr_grid(:, x < gl_dist);
 
-% plot
-figure;
-tiledlayout(2,1,'TileSpacing','none','Padding','none')
-nexttile % calving front correlation
-imagesc(x_crop, y, front_corr_grid); colormap copper; clim([0.7,1])
-nexttile % grounding line correlation
-imagesc(x_crop, y, gl_corr_grid); colormap copper; clim([0.7,1])
-cb = colorbar;
-cb.Layout.Tile = 'east';
-% save
-exportgraphics(gcf, 'plots/temporal_correlation.png','Resolution',300)
-
-
+%% APPENDIX: un-used code
 % CODE BELOW IS NOT USED (but saved for reference)
 % %% Correlation between h(t), calving front, and grounding line
 % n_gcp = 20;
