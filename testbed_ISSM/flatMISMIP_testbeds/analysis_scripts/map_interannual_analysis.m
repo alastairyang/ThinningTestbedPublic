@@ -22,6 +22,9 @@ foldernames_tbl = foldernames_tbl(bools,:);
 % plot parameter 
 ylabel_i = [1,4,7];
 xlabel_i = [7,8,9];
+Ws_symb = [10,20,30];
+FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
+
 
 % split the folder_dir into two groups, separated by grounding line depth
 folder_dir_groups = cell(1,2);
@@ -41,11 +44,18 @@ end
 
 % shallower grounding line
 n_simu = size(folder_dir_groups{shallowGL_i}, 1);
-% pre-allocate
-deltaH_ctrl = cell(n_simu, 2);
-deltaH_expt = cell(n_simu, 2);
-gl_cells_ctrl = cell(n_simu,2);
-gl_cells_expt = cell(n_simu,2);
+% % pre-allocate
+% deltaH_ctrl = cell(n_simu, 2);
+% deltaH_expt = cell(n_simu, 2);
+% gl_cells_ctrl = cell(n_simu,2);
+% gl_cells_expt = cell(n_simu,2);
+W_symbs = zeros(n_simu,1);
+FC_symbs = zeros(n_simu,3);
+STs_cl = zeros(n_simu, 1200); % 1200 is length
+LTs_cl = zeros(n_simu, 1200); 
+% grounding line positions
+gl_ctrl = zeros(n_simu,1);
+gl_expt = zeros(n_simu,1);
 
 % iterate over Deep GL models
 for j = 1:n_simu
@@ -55,7 +65,10 @@ for j = 1:n_simu
     md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
     results_tbl_expt = struct2table(md_expt.results.TransientSolution);
     results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
-    % isolate the effect from localized basal perturbation
+    % get model information
+    modelname = md_ctrl.miscellaneous.name;
+    [W, GL, FC] = parse_modelname(modelname);
+    % isolate the delta H from localized basal perturbation
     deltaH = [results_tbl_expt.Thickness{:}] - [results_tbl_ctrl.Thickness{:}];
     deltaH_cell = num2cell(deltaH,1);
     [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, 50);
@@ -70,6 +83,11 @@ for j = 1:n_simu
         md_temp(mask >=0) = 0;
         md_grid(:,:,i) = md_temp;
     end
+
+    % obtain the grounding line positions from both the control and
+    % experiment
+    gl_ctrl(j) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(end).MaskOceanLevelset);
+    gl_expt(j) = locate_groundingline(md_expt, md_expt.results.TransientSolution(end).MaskOceanLevelset);
     % timeseries decomposition
     % we reshape x,y into a long vector and after decomposed return to a map
     xl = size(md_grid,1); yl = size(md_grid,2); nt = size(md_grid,3);
@@ -94,30 +112,110 @@ for j = 1:n_simu
     LTs_time_mean = squeeze(nanmean(LTs, [1,2]));
     LTs_time_min  = squeeze(min(LTs, [],[1,2]));
     
-    % Visualization
-    % long term: Total thinning extent and mean timseries 
     figure('Position',[100,100,1100,400]);
     t = tiledlayout(2,2);
     md_name = md_ctrl.miscellaneous.name(9:end);
     title(t,md_name,'interpreter','none')
     nexttile;
-    imagesc(x,y,-1*squeeze(LTs(:,:,end))); colorbar; clim([0,15]);
+    last_LTs = -1*squeeze(LTs(:,:,end));
+    imagesc(x,y,last_LTs); colorbar; clim([0,15]);
     title('Total thinning from trend component'); ylabel('Meter')
     nexttile;
     plot(0:0.1:26-0.1, squeeze(LTs_time_min)); xlim([0,26])
     title('Thinning trend'); xlabel('Year'); 
     nexttile;
-    imagesc(x,y,STs_max - STs_min);colorbar;clim([0,15]);
-    title('Mean cyclic magnitude'); 
+    STs_range = STs_max - STs_min;
+    imagesc(x,y,STs_range);colorbar;clim([0,15]);
+    title('cyclic magnitude'); 
     nexttile;
     imagesc(x,y,STs_std); colorbar;clim([0,15]);
     title('1 std cyclic mangitude')
 
+    % get the corresponding symbols for this scatter plot
+    W_symbs(j,1) = Ws_symb(W==Ws);
+    FC_symbs(j,:) = FCs_symb(FC==FCs,:);
     % save the plot
     save_dir = ['plots/diffu_mu_plots/',md_name,'.png'];
     exportgraphics(gcf, save_dir, 'Resolution',300)
     disp(['model ',md_name,' is completed!'])
+
+    % save the center flow line
+    STs_cl(j,:) = STs_range(size(STs_range,1)/2,:);
+    LTs_cl(j,:) = last_LTs(size(last_LTs,1)/2,:);
 end
+%% Diffused pulse: plot the along flow profile
+ds = 50;
+ylim_up = 20;
+% parameter for gaussian patch dimensions
+gauss_xloc = 3.2e4;
+gauss_width_ratio = 0.08;
+wid_eff_factor = 4; % 4 times the sigma (in the gaussian width) 
+
+figure('Position',[100,100,800,600])
+tiledlayout(2,1,'TileSpacing','none')
+nexttile
+for i = 1:n_simu
+    % make a new along flow x axis that have the x positions of the
+    % grounding line
+    old_x = 0:ds:size(STs_cl,2)*ds-1;
+    new_x = sort([old_x, gl_ctrl(i), gl_expt(i)]);
+    STs_cl_interp = interp1(old_x, STs_cl(i,:), new_x);
+    % plot solid line from x = 0 to gl from the experiment
+    gl_expt_i = find(new_x==gl_expt(i));
+    plot(new_x(1:gl_expt_i), STs_cl_interp(1:gl_expt_i),'LineStyle','-','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    plot(new_x(gl_expt_i+1:end), STs_cl_interp(gl_expt_i+1:end),'LineStyle','-.','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    % add the gl position as points
+    scatter(new_x(new_x==gl_expt(i)), STs_cl_interp(new_x==gl_expt(i)),W_symbs(i,1)*1.5,...
+            'filled','o','MarkerFaceColor',FC_symbs(i,:));hold on
+    scatter(new_x(new_x==gl_ctrl(i)), STs_cl_interp(new_x==gl_ctrl(i)),W_symbs(i,1)*1.5,...
+            'o','MarkerEdgeColor',FC_symbs(i,:));hold on
+end
+hold off
+ylim([0,ylim_up])
+for j = 1:length(Ws)
+    patch_width = (Ws(j)*gauss_width_ratio*wid_eff_factor)/2;
+    left_x = gauss_xloc - patch_width;
+    right_x = gauss_xloc + patch_width;
+    pt = patch([left_x,right_x,right_x,left_x],[0,0,ylim_up,ylim_up],[217,217,217]/255);
+    pt.FaceAlpha = 0.3;
+    pt.EdgeAlpha = 0.5;
+end
+
+nexttile
+for i = 1:n_simu
+    % make a new along flow x axis that have the x positions of the
+    % grounding line
+    old_x = 0:ds:size(LTs_cl,2)*ds-1;
+    new_x = sort([old_x, gl_ctrl(i), gl_expt(i)]);
+    LTs_cl_interp = interp1(old_x, LTs_cl(i,:), new_x);
+    % plot solid line from x = 0 to gl from the experiment
+    gl_expt_i = find(new_x==gl_expt(i));
+    plot(new_x(1:gl_expt_i), LTs_cl_interp(1:gl_expt_i),'LineStyle','-','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    plot(new_x(gl_expt_i+1:end), LTs_cl_interp(gl_expt_i+1:end),'LineStyle','-.','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    % add the gl position as points
+    scatter(new_x(new_x==gl_expt(i)), LTs_cl_interp(new_x==gl_expt(i)),W_symbs(i,1)*1.5,...
+            'filled','o','MarkerFaceColor',FC_symbs(i,:));hold on
+    scatter(new_x(new_x==gl_ctrl(i)), LTs_cl_interp(new_x==gl_ctrl(i)),W_symbs(i,1)*1.5,...
+            'o','MarkerEdgeColor',FC_symbs(i,:));hold on
+
+end
+ylim([0,ylim_up])
+hold off
+for j = 1:length(Ws)
+    patch_width = (Ws(j)*gauss_width_ratio*wid_eff_factor)/2;
+    left_x = gauss_xloc - patch_width;
+    right_x = gauss_xloc + patch_width;
+    pt = patch([left_x,right_x,right_x,left_x],[0,0,ylim_up,ylim_up],[217,217,217]/255);
+    pt.FaceAlpha = 0.3;
+    pt.EdgeAlpha = 0.5;
+end
+xlabel('Distance (m)','Interpreter','latex','FontSize',13)
+exportgraphics(gcf, 'plots/local_basal_profile_diffu.png','Resolution',300)
+
 
 %% Experiment with polynomial de-trending: transient pulse
 % model parameters and plot parameters
@@ -161,6 +259,13 @@ deltaH_expt = cell(n_simu, 2);
 gl_cells_ctrl = cell(n_simu,2);
 gl_cells_expt = cell(n_simu,2);
 
+W_symbs = zeros(n_simu,1);
+FC_symbs = zeros(n_simu,3);
+STs_cl = zeros(n_simu, 1200); % 1200 is length
+LTs_cl = zeros(n_simu, 1200); 
+% grounding line positions
+gl_ctrl = zeros(n_simu,1);
+gl_expt = zeros(n_simu,1);
 % iterate over Deep GL models
 for j = 1:n_simu
     % read the model
@@ -169,6 +274,9 @@ for j = 1:n_simu
     md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
     results_tbl_expt = struct2table(md_expt.results.TransientSolution);
     results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
+    % get model information
+    modelname = md_ctrl.miscellaneous.name;
+    [W, GL, FC] = parse_modelname(modelname);
     % isolate the effect from localized basal perturbation
     deltaH = [results_tbl_expt.Thickness{:}] - [results_tbl_ctrl.Thickness{:}];
     deltaH_cell = num2cell(deltaH,1);
@@ -184,6 +292,10 @@ for j = 1:n_simu
         md_temp(mask >=0) = 0;
         md_grid(:,:,i) = md_temp;
     end
+    % obtain the grounding line positions from both the control and
+    % experiment
+    gl_ctrl(j) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(end).MaskOceanLevelset);
+    gl_expt(j) = locate_groundingline(md_expt, md_expt.results.TransientSolution(end).MaskOceanLevelset);
     % timeseries decomposition
     % we reshape x,y into a long vector and after decomposed return to a map
     xl = size(md_grid,1); yl = size(md_grid,2); nt = size(md_grid,3);
@@ -214,13 +326,15 @@ for j = 1:n_simu
     md_name = md_ctrl.miscellaneous.name(9:end);
     title(t,md_name,'interpreter','none')
     nexttile;
-    imagesc(x,y,-1*squeeze(LTs(:,:,end))); colorbar; clim([0,15]);
+    last_LTs = -1*squeeze(LTs(:,:,end));
+    imagesc(x,y,last_LTs); colorbar; clim([0,15]);
     title('Total thinning from trend component'); ylabel('Meter')
     nexttile;
     plot(0:0.1:26-0.1, squeeze(LTs_time_min)); xlim([0,26])
     title('Thinning trend'); xlabel('Year'); 
     nexttile;
-    imagesc(x,y,STs_max - STs_min);colorbar;clim([0,15]);
+    STs_range = STs_max - STs_min;
+    imagesc(x,y,STs_range);colorbar;clim([0,15]);
     title('cyclic magnitude'); 
     nexttile;
     imagesc(x,y,STs_std); colorbar;clim([0,15]);
@@ -230,7 +344,84 @@ for j = 1:n_simu
     save_dir = ['plots/pulse_mu_plots/',md_name,'.png'];
     exportgraphics(gcf, save_dir, 'Resolution',300)
     disp(['model ',md_name,' is completed!'])
+
+    % save the center flow line
+    STs_cl(j,:) = STs_range(size(STs_range,1)/2,:);
+    LTs_cl(j,:) = last_LTs(size(last_LTs,1)/2,:);
 end
+
+%% Transient pulse: plot the along flow profile
+ds = 50;
+ylim_up = 20;
+% parameter for gaussian patch dimensions
+gauss_xloc = 3.2e4;
+gauss_width_ratio = 0.08;
+wid_eff_factor = 4; % 4 times the sigma (in the gaussian width) 
+
+figure('Position',[100,100,800,600])
+tiledlayout(2,1,'TileSpacing','none')
+nexttile
+for i = 1:n_simu
+    % make a new along flow x axis that have the x positions of the
+    % grounding line
+    old_x = 0:ds:size(STs_cl,2)*ds-1;
+    new_x = sort([old_x, gl_ctrl(i), gl_expt(i)]);
+    STs_cl_interp = interp1(old_x, STs_cl(i,:), new_x);
+    % plot solid line from x = 0 to gl from the experiment
+    gl_expt_i = find(new_x==gl_expt(i));
+    plot(new_x(1:gl_expt_i), STs_cl_interp(1:gl_expt_i),'LineStyle','-','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    plot(new_x(gl_expt_i+1:end), STs_cl_interp(gl_expt_i+1:end),'LineStyle','-.','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    % add the gl position as points
+    scatter(new_x(new_x==gl_expt(i)), STs_cl_interp(new_x==gl_expt(i)),W_symbs(i,1)*1.5,...
+            'filled','o','MarkerFaceColor',FC_symbs(i,:));hold on
+    scatter(new_x(new_x==gl_ctrl(i)), STs_cl_interp(new_x==gl_ctrl(i)),W_symbs(i,1)*1.5,...
+            'o','MarkerEdgeColor',FC_symbs(i,:));hold on
+end
+hold off
+ylim([0,ylim_up])
+for j = 1:length(Ws)
+    patch_width = (Ws(j)*gauss_width_ratio*wid_eff_factor)/2;
+    left_x = gauss_xloc - patch_width;
+    right_x = gauss_xloc + patch_width;
+    pt = patch([left_x,right_x,right_x,left_x],[0,0,ylim_up,ylim_up],[217,217,217]/255);
+    pt.FaceAlpha = 0.3;
+    pt.EdgeAlpha = 0.5;
+end
+
+nexttile
+for i = 1:n_simu
+    % make a new along flow x axis that have the x positions of the
+    % grounding line
+    old_x = 0:ds:size(LTs_cl,2)*ds-1;
+    new_x = sort([old_x, gl_ctrl(i), gl_expt(i)]);
+    LTs_cl_interp = interp1(old_x, LTs_cl(i,:), new_x);
+    % plot solid line from x = 0 to gl from the experiment
+    gl_expt_i = find(new_x==gl_expt(i));
+    plot(new_x(1:gl_expt_i), LTs_cl_interp(1:gl_expt_i),'LineStyle','-','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    plot(new_x(gl_expt_i+1:end), LTs_cl_interp(gl_expt_i+1:end),'LineStyle','-.','LineWidth',W_symbs(i,1)*0.05,'Color',FC_symbs(i,:));
+    hold on
+    % add the gl position as points
+    scatter(new_x(new_x==gl_expt(i)), LTs_cl_interp(new_x==gl_expt(i)),W_symbs(i,1)*1.5,...
+            'filled','o','MarkerFaceColor',FC_symbs(i,:));hold on
+    scatter(new_x(new_x==gl_ctrl(i)), LTs_cl_interp(new_x==gl_ctrl(i)),W_symbs(i,1)*1.5,...
+            'o','MarkerEdgeColor',FC_symbs(i,:));hold on
+
+end
+ylim([0,ylim_up])
+hold off
+for j = 1:length(Ws)
+    patch_width = (Ws(j)*gauss_width_ratio*wid_eff_factor)/2;
+    left_x = gauss_xloc - patch_width;
+    right_x = gauss_xloc + patch_width;
+    pt = patch([left_x,right_x,right_x,left_x],[0,0,ylim_up,ylim_up],[217,217,217]/255);
+    pt.FaceAlpha = 0.3;
+    pt.EdgeAlpha = 0.5;
+end
+xlabel('Distance (m)','Interpreter','latex','FontSize',13)
+exportgraphics(gcf, 'plots/local_basal_profile_pulse.png','Resolution',300)
 
 %% Experiment with EOF
 % parameter
