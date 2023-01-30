@@ -66,7 +66,7 @@ for jj = md_idx
     end
 
     % RUN
-    for steps = 9:10
+    for steps = 9
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -808,7 +808,7 @@ for jj = md_idx
             perturb_t = 0:gauss_timestep:perturb_duration-gauss_timestep;
             no_perturb_t = 0:gauss_timestep:no_retreat_duration-gauss_timestep;
 
-            % get pulse gaussian
+            % get pulse gaussian (time dimension)
             pulse_gauss = gauss_mag*make_pulse_gauss(pulse_gauss_tscale, gauss_efold, gauss_perturb_repeat_tscale, gauss_timestep, pulse_gauss_tshift);
             % stack them to make a full sequence
             total_cycle = perturb_duration/gauss_perturb_repeat_tscale;
@@ -845,7 +845,10 @@ for jj = md_idx
             % record the results at every 0.1 yr
             for iter = 1:length(gauss_t)
                 amp = gauss_mags(iter)*init_taub_grid(y0_i,x0_i);
-                width = gauss_width_ratio*var_table.('fjord_width');
+                % scale with respect to the max width in our testbeds
+                max_width = max(mdvar_combs.fjord_width);
+                width_ratio = var_table.('fjord_width')/max_width;
+                width = gauss_width_ratio*max_width*sqrt(width_ratio);
                 delta_taub = transient_slippatch(X,Y,x0,y0,width,amp);
                 % convert back to changes in fric coefficient
                 delta_taub = InterpFromGridToMesh(x',y',delta_taub,md.mesh.x,md.mesh.y,0);
@@ -985,7 +988,10 @@ for jj = md_idx
             % record the results at every 0.1 yr
             for iter = 1:length(gauss_t)
                 amp = gauss_mags(iter)*init_taub_grid(y0_i,x0_i);
-                width = gauss_width_ratio*var_table.('fjord_width');
+                % scale with respect to the max width in our testbeds
+                max_width = max(mdvar_combs.fjord_width);
+                width_ratio = var_table.('fjord_width')/max_width;
+                width = gauss_width_ratio*max_width*sqrt(width_ratio);
                 delta_taub = transient_slippatch(X,Y,x0,y0,width,amp);
                 % convert back to changes in fric coefficient
                 delta_taub = InterpFromGridToMesh(x',y',delta_taub,md.mesh.x,md.mesh.y,0);
@@ -1125,7 +1131,10 @@ for jj = md_idx
             delta_C_all = zeros(length(C0), length(gauss_t));
             for iter = 1:length(gauss_t)
                 amp = gauss_mags(iter)*init_taub_grid(y0_i,x0_i);
-                width = gauss_width_ratio*var_table.('fjord_width');
+                % scale with respect to the max width in our testbeds
+                max_width = max(mdvar_combs.fjord_width);
+                width_ratio = var_table.('fjord_width')/max_width;
+                width = gauss_width_ratio*max_width*sqrt(width_ratio);
                 delta_taub = transient_slippatch(X,Y,x0,y0,width,amp);
                 % convert back to changes in fric coefficient
                 delta_taub = InterpFromGridToMesh(x',y',delta_taub,md.mesh.x,md.mesh.y,0);
@@ -1331,7 +1340,10 @@ for jj = md_idx
             delta_C_all = zeros(length(C0), length(gauss_t));
             for iter = 1:length(gauss_t)
                 amp = gauss_mags(iter)*init_taub_grid(y0_i,x0_i);
-                width = gauss_width_ratio*var_table.('fjord_width');
+                % scale with respect to the max width in our testbeds
+                max_width = max(mdvar_combs.fjord_width);
+                width_ratio = var_table.('fjord_width')/max_width;
+                width = gauss_width_ratio*max_width*sqrt(width_ratio);
                 delta_taub = transient_slippatch(X,Y,x0,y0,width,amp);
                 % convert back to changes in fric coefficient
                 delta_taub = InterpFromGridToMesh(x',y',delta_taub,md.mesh.x,md.mesh.y,0);

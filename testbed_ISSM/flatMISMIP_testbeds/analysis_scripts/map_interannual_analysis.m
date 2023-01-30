@@ -5,7 +5,8 @@
 % perturbation: the magnitude of cyclic and trend change
 
 %% Experiment with polynomial de-trending
-pulse_type = 'Pulse'; % first letter needs to be capitalized
+pulse_type = 'Diffu'; % types: "Diffu","Pulse"
+geom_type = 'deep'; % types: "deep", "shallow"
 
 % model parameters and plot parameters
 % read in the model parameter table
@@ -43,13 +44,22 @@ end
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
 
+%% specify the model you want to plot from
+
+% iterate over Deep GL models
+%tiledlayout(3,3,'TileSpacing','tight')
+switch geom_type
+    case 'deep'
+        geom_i = deeperGL_i;
+    case 'shallow'
+        geom_i = shallowGL_i;
+    otherwise
+        warning('unknown depth specification!')
+end
+
 % shallower grounding line
 n_simu = size(folder_dir_groups{shallowGL_i}, 1);
 % % pre-allocate
-% deltaH_ctrl = cell(n_simu, 2);
-% deltaH_expt = cell(n_simu, 2);
-% gl_cells_ctrl = cell(n_simu,2);
-% gl_cells_expt = cell(n_simu,2);
 W_symbs = zeros(n_simu,1);
 FC_symbs = zeros(n_simu,3);
 STs_cl = zeros(n_simu, 1200); % 1200 is length
@@ -58,10 +68,10 @@ LTs_cl = zeros(n_simu, 1200);
 gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
-% iterate over Deep GL models
-for j = 1:n_simu
+% iterate over deep or shallow GL models
+for j = 9
     % read the model
-    group = folder_dir_groups{deeperGL_i};
+    group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
     md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
     results_tbl_expt = struct2table(md_expt.results.TransientSolution);
@@ -93,7 +103,7 @@ for j = 1:n_simu
     % we reshape x,y into a long vector and after decomposed return to a map
     xl = size(md_grid,1); yl = size(md_grid,2); nt = size(md_grid,3);
     md_grid_v = transpose(reshape(md_grid, [xl*yl, size(md_grid,3)]));
-    STs = detrend(md_grid_v, 5);
+    STs = detrend(md_grid_v, 12);
     LTs = md_grid_v - STs;
     LTs = reshape(LTs, [nt, xl, yl]);
     STs = reshape(STs, [nt, xl, yl]);
@@ -123,7 +133,7 @@ for j = 1:n_simu
     title('Total thinning from trend component'); ylabel('Meter')
     nexttile;
     plot(0:0.1:26-0.1, squeeze(LTs_time_min)); xlim([0,26])
-    title('Thinning trend'); xlabel('Year'); 
+    title('Thinning trend'); xlabel('Year')
     nexttile;
     STs_range = STs_max - STs_min;
     imagesc(x,y,STs_range);colorbar;clim([0,15]);
@@ -143,8 +153,11 @@ for j = 1:n_simu
     % save the center flow line
     STs_cl(j,:) = STs_range(size(STs_range,1)/2,:);
     LTs_cl(j,:) = last_LTs(size(last_LTs,1)/2,:);
+
+    % report
+    disp(['model ', modelname(9:end),' type ',geom_type, ' is processed!'])
 end
-%% Diffused pulse: plot the along flow profile
+%% plot the along flow profile
 ds = 50;
 ylim_up = 20;
 % parameter for gaussian patch dimensions
@@ -215,7 +228,7 @@ for j = 1:length(Ws)
     pt.EdgeAlpha = 0.5;
 end
 xlabel('Distance (m)','Interpreter','latex','FontSize',13)
-plot_name = ['plots/local_basal_profile_', pulse_type, '.png'];
+plot_name = ['plots/local_basal_profile_', pulse_type, '_', geom_type, '.png'];
 exportgraphics(gcf, plot_name ,'Resolution',300)
 
 
