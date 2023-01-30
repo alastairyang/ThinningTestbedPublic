@@ -66,7 +66,7 @@ for jj = md_idx
     end
 
     % RUN
-    for steps = 9
+    for steps = 1:3
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);

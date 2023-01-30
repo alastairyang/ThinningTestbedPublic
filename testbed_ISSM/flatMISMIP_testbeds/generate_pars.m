@@ -81,7 +81,7 @@ function write_par(var_table)
     fclose(fid);
     % destination file
     fid = fopen(['long_par_files/', par_name,'.par'], 'w');
-    fprintf(fid, ['Ly = ', num2str(Ly),'; \n']);
+    fprintf(fid, ['Ly_eff = ', num2str(Ly),'; \n']);
     fprintf(fid, ['delta_gl_depth = ', num2str(delta_gl_depth), '; \n']);
     fprintf(fid, ['bg_fric_coef = ', num2str(bg_fric_coef),'; \n']);
     fwrite(fid, frest);
