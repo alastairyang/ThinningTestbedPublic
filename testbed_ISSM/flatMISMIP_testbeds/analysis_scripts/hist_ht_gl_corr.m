@@ -42,10 +42,9 @@ end
 % you can specify if you want to plot experiment (e.g., mass unloading) or
 % the control run
 md_type = 'ctrl'; % options: "expt", "ctrl"
-geom_type = 'shallow'; % options: "deep", "shallow"
+geom_type = 'deep'; % options: "deep", "shallow"
 
 % iterate over Deep GL models
-%tiledlayout(3,3,'TileSpacing','tight')
 switch geom_type
     case 'deep'
         geom_i = deeperGL_i;
@@ -54,8 +53,12 @@ switch geom_type
     otherwise
         warning('unknown depth specification!')
 end
-figure('Position',[100,100,1000,800]);
+%figure('Position',[100,100,1000,800]);
 n_simu = size(folder_dir_groups{geom_i}, 1);
+gl_hist = cell(1,n_simu);
+front_hist = cell(1,n_simu);
+
+% start extracting data
 for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
@@ -99,27 +102,40 @@ for j = 1:n_simu
     gl_corr_grid = gl_corr_grid(:, x < gl_dist);
     front_corr_grid = front_corr_grid(:, x < gl_dist);
 
-    % make plot
-    %tt = nexttile;
-    subplot(3,3,j)
-    q = histogram(front_corr_grid,'normalization','probability'); hold on;
-    h = histogram(gl_corr_grid,'normalization','probability'); hold on
-    h.BinEdges = 0.5:0.02:1;
-    q.BinEdges = 0.5:0.02:1;
-    title(modelname(9:end))
+    % save to cells
+    gl_hist{j} = gl_corr_grid;
+    front_hist{j} = front_corr_grid;
+    %title(modelname(9:end))
     % add a grounding line + terminus plot as a inset box
     %axes('Position',[.2 .7 .2 .2])
-    p = get(gca, 'Position');
-    pp = axes('Parent', gcf, 'Position', [p(1)+0.01 p(2)+0.12 p(3)-0.15 p(4)-0.15]);
-    yyaxis left
-    plot(ht_data.t, ht_data.front(1:end-1)); hold on;
-    set(gca,'xtick',[],'ytick',[])
-    yyaxis right
-    plot(ht_data.t, ht_data.gl(1:end-1));
-    set(gca,'xtick',[],'ytick',[])
+%     p = get(gca, 'Position');
+%     pp = axes('Parent', gcf, 'Position', [p(1)+0.01 p(2)+0.12 p(3)-0.15 p(4)-0.15]);
+%     yyaxis left
+%     plot(ht_data.t, ht_data.front(1:end-1)); hold on;
+%     set(gca,'xtick',[],'ytick',[])
+%     yyaxis right
+%     plot(ht_data.t, ht_data.gl(1:end-1));
+%     set(gca,'xtick',[],'ytick',[])
     %legend(["GL","Front"])
 
     disp([modelname,' is processed.'])
 
 end
+
+%% Making the plot
+figure('Position',[100,100,800,800])
+tiledlayout(3,3,'TileSpacing','tight')
+for j = 1:n_simu
+    nexttile
+    q = histogram(front_hist{j},'normalization','probability'); hold on;
+    h = histogram(gl_hist{j},'normalization','probability'); hold on
+    h.BinEdges = 0.5:0.02:1;
+    q.BinEdges = 0.5:0.02:1;
+    if j == 1 % add legend
+        legend(["terminus","grounding line"],'Location','northwest')
+    end
+end
+ax = nexttile(4); ax.YLabel.String = 'Percentage'; ax.FontSize = 13;
+ax = nexttile(8); ax.XLabel.String = 'Correlation';ax.FontSize = 13;
+
 exportgraphics(gcf,['plots/correlation_',md_type,'_',geom_type,'.pdf'],"ContentType","vector")

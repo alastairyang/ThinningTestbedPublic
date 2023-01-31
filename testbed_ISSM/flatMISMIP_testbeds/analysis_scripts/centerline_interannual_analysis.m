@@ -79,8 +79,19 @@ end
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
 
-%% shallower grounding line
-n_simu = size(expt_folder_dir_groups{shallowGL_i}, 1);
+%% Analyze
+geom_type = 'deep';
+
+switch geom_type
+    case 'deep'
+        geom_i = deeperGL_i;
+    case 'shallow'
+        geom_i = shallowGL_i;
+    otherwise
+        warning('unknown geom type')
+end
+
+n_simu = size(expt_folder_dir_groups{geom_i}, 1);
 % initialize
 A0s_shallow = zeros(1, n_simu);
 decay_lengths_shallow = zeros(1,n_simu);
@@ -89,8 +100,8 @@ rel_t = cell(1, n_simu);
 x_pos = cell(1, n_simu);
 for j = 1:n_simu
     % load in data from paths
-    ctrl_path = ctrl_folder_dir_groups{shallowGL_i}(j,:);
-    expt_path = expt_folder_dir_groups{shallowGL_i}(j,:);
+    ctrl_path = ctrl_folder_dir_groups{geom_i}(j,:);
+    expt_path = expt_folder_dir_groups{geom_i}(j,:);
     ctrl = load([ctrl_path.folder{1},'/', ctrl_path.name{1}]);
     expt = load([expt_path.folder{1},'/', expt_path.name{1}]);
     % get the last grounding line position
@@ -106,38 +117,6 @@ for j = 1:n_simu
 %     GL_symb = GLs_symb(GL==GLs); % marker type
 %     FC_symb = FCs_symb(FC==FCs,:); % marker color (rgb)
 %     scatter(A0s_shallow(j), decay_lengths_shallow(j), W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
-%     hold on;
-end
-
-%% Deeper grounding line
-% deeper grounding line
-n_simu = size(expt_folder_dir_groups{deeperGL_i}, 1);
-% initialize
-A0s_deep = zeros(1, n_simu);
-decay_lengths_deep = zeros(1,n_simu);
-
-freqs = cell(1, n_simu);
-rel_t = cell(1, n_simu);
-x_pos = cell(1, n_simu);
-for j = 1:n_simu
-    % load in data from paths
-    ctrl_path = ctrl_folder_dir_groups{deeperGL_i}(j,:);
-    expt_path = expt_folder_dir_groups{deeperGL_i}(j,:);
-    ctrl = load([ctrl_path.folder{1},'/', ctrl_path.name{1}]);
-    expt = load([expt_path.folder{1},'/', expt_path.name{1}]);
-    % get the last grounding line position
-    % we only look at the data points beteen that and the localized
-    % gaussian perturbation
-    gl_last_xloc = min(ctrl.ht_data.gl(end), expt.ht_data.gl(end));
-    % start analysis
-    [rel_t{j}, freqs{j}, x_pos{j}] = gauss_perturb_analysis(expt.ht_data.h, ctrl.ht_data.h, ctrl.ht_data.x, gauss_xloc, gl_last_xloc);
-
-    % assign plot legends according to parameters
-    [W, GL, FC] = parse_modelname(ctrl_path.name{1});
-%     W_symb = Ws_symb(W==Ws); % marker size
-%     GL_symb = GLs_symb(GL==GLs); % marker type
-%     FC_symb = FCs_symb(FC==FCs,:); % marker color (rgb)
-%     scatter(A0s_deep(j), decay_lengths_deep(j), W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
 %     hold on;
 end
 
@@ -189,7 +168,7 @@ function [rel_t, freq, x_pos] = gauss_perturb_analysis(perturb_ht, nopertb_ht, p
     t = yr/dt;
     % decompose timeseries into short term (cyclic) and long term (trend)
     delta_ht = delta_ht(t+1:end-t,:);
-    STs = detrend(delta_ht, 5);
+    STs = detrend(delta_ht, 12);
     LTs = delta_ht - STs;
     
 %     % make a plot of the decomposed trend and inter-annual variability

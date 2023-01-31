@@ -216,7 +216,7 @@ for j = 1:n_simu
 end
 
 %% Make tiled plots
-
+% shallower
 figure('Position',[200,200,500,500]);
 h = tiledlayout(3,3, 'TileSpacing', 'none', 'Padding', 'none');
 for j = 1:n_simu
@@ -241,9 +241,9 @@ cb = colorbar;
 cb.Layout.Tile = 'east';
 exportgraphics(gcf,'plots/dH_from_feedback_shallowGL.pdf')
 
-%%
+%% deeper
 figure('Position',[800,200,500,500]);
-h = tiledlayout(3,3, 'TileSpacing', 'none', 'Padding', 'none');
+h = tiledlayout(3,3, 'TileSpacing', 'tight');
 for j = 1:n_simu
     nexttile
     imagesc(deltaH_expt{j,deeperGL_i}.x, deltaH_expt{j,deeperGL_i}.y,...
@@ -265,4 +265,5 @@ for j = 1:n_simu
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
+cb.Title.String = 'Elevation change (m)';
 exportgraphics(gcf,'plots/dH_from_feedback_deepGL.pdf')

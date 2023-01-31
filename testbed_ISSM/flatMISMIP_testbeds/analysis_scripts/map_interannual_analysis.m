@@ -57,8 +57,7 @@ switch geom_type
         warning('unknown depth specification!')
 end
 
-% shallower grounding line
-n_simu = size(folder_dir_groups{shallowGL_i}, 1);
+n_simu = size(folder_dir_groups{geom_i}, 1);
 % % pre-allocate
 W_symbs = zeros(n_simu,1);
 FC_symbs = zeros(n_simu,3);
@@ -69,7 +68,7 @@ gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
 % iterate over deep or shallow GL models
-for j = 9
+for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -103,7 +102,7 @@ for j = 9
     % we reshape x,y into a long vector and after decomposed return to a map
     xl = size(md_grid,1); yl = size(md_grid,2); nt = size(md_grid,3);
     md_grid_v = transpose(reshape(md_grid, [xl*yl, size(md_grid,3)]));
-    STs = detrend(md_grid_v, 12);
+    STs = detrend(md_grid_v, 18);
     LTs = md_grid_v - STs;
     LTs = reshape(LTs, [nt, xl, yl]);
     STs = reshape(STs, [nt, xl, yl]);
@@ -123,31 +122,34 @@ for j = 9
     LTs_time_mean = squeeze(nanmean(LTs, [1,2]));
     LTs_time_min  = squeeze(min(LTs, [],[1,2]));
     
-    figure('Position',[100,100,1100,400]);
-    t = tiledlayout(2,2);
     md_name = md_ctrl.miscellaneous.name(9:end);
-    title(t,md_name,'interpreter','none')
-    nexttile;
+    % trend: find total delta H
+    % cyclic: find range (max - min)
     last_LTs = -1*squeeze(LTs(:,:,end));
-    imagesc(x,y,last_LTs); colorbar; clim([0,15]);
-    title('Total thinning from trend component'); ylabel('Meter')
-    nexttile;
-    plot(0:0.1:26-0.1, squeeze(LTs_time_min)); xlim([0,26])
-    title('Thinning trend'); xlabel('Year')
-    nexttile;
     STs_range = STs_max - STs_min;
-    imagesc(x,y,STs_range);colorbar;clim([0,15]);
-    title('cyclic magnitude'); 
-    nexttile;
-    imagesc(x,y,STs_std); colorbar;clim([0,15]);
-    title('1 std cyclic mangitude')
+
+%     figure('Position',[100,100,1100,400]);
+%     t = tiledlayout(2,2);
+%     title(t,md_name,'interpreter','none')
+%     nexttile;
+%     imagesc(x,y,last_LTs); colorbar; clim([0,15]);
+%     title('Total thinning from trend component'); ylabel('Meter')
+%     nexttile;
+%     plot(0:0.1:26-0.1, squeeze(LTs_time_min)); xlim([0,26])
+%     title('Thinning trend'); xlabel('Year')
+%     nexttile;
+%     imagesc(x,y,STs_range);colorbar;clim([0,15]);
+%     title('cyclic magnitude'); 
+%     nexttile;
+%     imagesc(x,y,STs_std); colorbar;clim([0,15]);
+%     title('1 std cyclic mangitude')
 
     % get the corresponding symbols for this scatter plot
     W_symbs(j,1) = Ws_symb(W==Ws);
     FC_symbs(j,:) = FCs_symb(FC==FCs,:);
     % save the plot
-    save_dir = ['plots/diffu_mu_plots/',md_name,'.png'];
-    exportgraphics(gcf, save_dir, 'Resolution',300)
+%     save_dir = ['plots/diffu_mu_plots/',md_name,'.png'];
+%     exportgraphics(gcf, save_dir, 'Resolution',300)
     disp(['model ',md_name,' is completed!'])
 
     % save the center flow line
@@ -196,6 +198,10 @@ for j = 1:length(Ws)
     pt.FaceAlpha = 0.3;
     pt.EdgeAlpha = 0.5;
 end
+text_x = 1;
+text_y = ylim_up - 1;
+text(text_x, text_y, 'Cyclic magnitude','Interpreter','latex','FontSize',13)
+ylabel('Elevation change (m)','Interpreter','latex','FontSize',13)
 
 nexttile
 for i = 1:n_simu
@@ -215,7 +221,6 @@ for i = 1:n_simu
             'filled','o','MarkerFaceColor',FC_symbs(i,:));hold on
     scatter(new_x(new_x==gl_ctrl(i)), LTs_cl_interp(new_x==gl_ctrl(i)),W_symbs(i,1)*1.5,...
             'o','MarkerEdgeColor',FC_symbs(i,:));hold on
-
 end
 ylim([0,ylim_up])
 hold off
@@ -228,6 +233,10 @@ for j = 1:length(Ws)
     pt.EdgeAlpha = 0.5;
 end
 xlabel('Distance (m)','Interpreter','latex','FontSize',13)
+ylabel('Elevation change (m)','Interpreter','latex','FontSize',13)
+text_x = 1;
+text_y = ylim_up-1;
+text(text_x, text_y, 'Total thinning in trend component','Interpreter','latex','FontSize',13);
 plot_name = ['plots/local_basal_profile_', pulse_type, '_', geom_type, '.png'];
 exportgraphics(gcf, plot_name ,'Resolution',300)
 
