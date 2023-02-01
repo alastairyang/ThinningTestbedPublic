@@ -66,7 +66,7 @@ for jj = md_idx
     end
 
     % RUN
-    for steps = 3:4
+    for steps = 11
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1178,7 +1178,7 @@ for jj = md_idx
             md.friction.C = [C0; next_start_time];
 
             it_count = 0;
-            for it = 1:end_time/gauss_timestep
+            for it = 1:(end_time/gauss_timestep)-1
                 it_count = it_count + 1;
                 results = md.results.TransientSolution;
                 % restart and specify sim duration
@@ -1206,7 +1206,7 @@ for jj = md_idx
                 % solve
                 md = solve(md,'tr');
                 
-                if it_count == 10 % save every 10 time steps (every 0.1 year)
+                if it_count == 10 || it == 1 % save every 10 time steps (every 0.1 year) & save the first time
                     it_count = 0;
                     new_results = [new_results, md.results.TransientSolution(1)];
                     % remove the extra fields
@@ -1387,7 +1387,7 @@ for jj = md_idx
             md.friction.C = [C0; next_start_time];
 
             it_count = 0;
-            for it = 1:end_time/gauss_timestep
+            for it = 1:(end_time/gauss_timestep)-1
                 it_count = it_count + 1;
                 results = md.results.TransientSolution;
                 % restart and specify sim duration
@@ -1415,7 +1415,7 @@ for jj = md_idx
                 % solve
                 md = solve(md,'tr');
                 
-                if it_count == 10 % save every 10 time steps (every 0.1 year)
+                if it_count == 10 || it == 1 % save every 10 time steps (every 0.1 year)
                     it_count = 0;
                     new_results = [new_results, md.results.TransientSolution(1)];
                     % remove the extra fields

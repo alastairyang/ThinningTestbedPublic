@@ -6,7 +6,7 @@
 
 %% Experiment with polynomial de-trending
 pulse_type = 'Diffu'; % types: "Diffu","Pulse"
-geom_type = 'deep'; % types: "deep", "shallow"
+geom_type = 'shallow'; % types: "deep", "shallow"
 
 % model parameters and plot parameters
 % read in the model parameter table
@@ -14,8 +14,8 @@ md_vars = readtable('md_var_combinations.csv');
 Ws = sort(unique(md_vars.('fjord_width')));
 GLs = sort(unique(md_vars.('delta_groundingline_depth')));
 FCs = sort(unique(md_vars.('background_friccoef')));
-ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
-expt_name = ['MISMIP_yangTransient_Calving_MassUnloading_',pulse_type,'GaussianPerturb_8.mat'];
+ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+expt_name = ['MISMIP_yangTransient_Calving_',pulse_type,'GaussianPerturb_8.mat'];
 % get all model foldernames
 foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
 foldernames_tbl = struct2table(foldernames);
@@ -68,7 +68,7 @@ gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
 % iterate over deep or shallow GL models
-for j = 1:n_simu
+for j = 9
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -80,6 +80,7 @@ for j = 1:n_simu
     [W, GL, FC] = parse_modelname(modelname);
     % isolate the delta H from localized basal perturbation
     deltaH = [results_tbl_expt.Thickness{:}] - [results_tbl_ctrl.Thickness{:}];
+    deltaMask = [results_tbl_expt.MaskOceanLevelset{:}] - [results_tbl_ctrl.MaskOceanLevelset{:}];
     deltaH_cell = num2cell(deltaH,1);
     [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, 50);
     [mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, 50);
