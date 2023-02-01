@@ -199,7 +199,7 @@ for jj = md_idx
             md.timestepping = timesteppingadaptive();
             md.timestepping.time_step_min = 0.01;
             md.timestepping.start_time = start_time;
-            md.timestepping.final_time = md.timestepping.start_time + 300;
+            md.timestepping.final_time = md.timestepping.start_time + 500;
             
             % parameters
             np = min(round(md.mesh.numberofelements/1000), feature('numcores'));

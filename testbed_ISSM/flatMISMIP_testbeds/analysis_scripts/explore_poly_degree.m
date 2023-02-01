@@ -117,7 +117,7 @@ for j = 1:n_simu % iterate over simulation for the given depth
     simu_errors{2,j} = LTs_errors;
 end
 
-%%
+%% plot the error over degree in polynomial
 figure
 for k = 1:n_simu
     subplot(2,1,1); 
