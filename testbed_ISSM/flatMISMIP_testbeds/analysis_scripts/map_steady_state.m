@@ -1,5 +1,5 @@
 %% Plot the map view 2D velocity, thickness, basal drag at the steady state
-geom_type = 'shallow'; % options: "deep" or "shallow"
+geom_type = 'deep'; % options: "deep" or "shallow"
 ds = 50; % grid size for the regular grid
 
 % model parameters and plot parameters
@@ -51,6 +51,7 @@ n_simu = size(folder_dir_groups{geom_i}, 1);
 vels = cell(1, n_simu);
 hs = cell(1, n_simu);
 tau_bs = cell(1, n_simu);
+gls = cell(1, n_simu);
 
 for j = 1:n_simu
     % read the model
@@ -65,6 +66,16 @@ for j = 1:n_simu
     [vels{j}, ~, ~]  = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, vel, ds);
     [hs{j}, ~, ~]    = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, h, ds);
     [tau_bs{j}, ~, ~]= mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, tau_b, ds);
+    % get the grounding line positions
+    gls{j} = isoline(md, md.results.TransientSolution(end).MaskOceanLevelset,'value',0);
+    % if multiple enclosed areas were found, we only save the one that has
+    % most nodes
+    if size(gls{j},2) ~= 1
+        gl_tbl = struct2table(gls{j});
+        gl_tbl = sortrows(gl_tbl, 'nods','descend');
+        gls{j} = table2struct(gl_tbl(1,:));
+    end
+        
 end
 % get the x,y axis
 [~, x, y]= mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, tau_b, ds);
@@ -76,10 +87,12 @@ figure('Position',[100,100,1000,500])
 tiledlayout(3,3, "TileSpacing","none")
 for j = 1:n_simu
     nexttile
-    imagesc(x,y,log10(vels{j}))
+    imagesc(x,y,log10(vels{j})); hold on
     clim([0,4])
     set(gca, 'xtick',[])
     set(gca, 'ytick',[])
+    % add grounding line position
+    scatter(gls{j}.x, gls{j}.y,8,'filled','r'); hold off
 end
 colorbar_ticks = 0:4;
 cb = colorbar;
@@ -94,10 +107,12 @@ figure('Position',[100,100,1000,500])
 tiledlayout(3,3, "TileSpacing","none")
 for j = 1:n_simu
     nexttile
-    imagesc(x,y,hs{j})
+    imagesc(x,y,hs{j}); hold on
     clim([0,800])
     set(gca, 'xtick',[])
     set(gca, 'ytick',[])
+    % add grounding line position
+    scatter(gls{j}.x, gls{j}.y,8,'filled','r'); hold off
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
@@ -109,10 +124,12 @@ figure('Position',[100,100,1000,500])
 tiledlayout(3,3, "TileSpacing","none")
 for j = 1:n_simu
     nexttile
-    imagesc(x,y,tau_bs{j})
+    imagesc(x,y,tau_bs{j}); hold on
     clim([5e4,3e5])
     set(gca, 'xtick',[])
     set(gca, 'ytick',[])
+    % add grounding line position
+    scatter(gls{j}.x, gls{j}.y,8,'filled','r'); hold off
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';

@@ -73,11 +73,12 @@ end
 
 %% For control group
 tiledlayout(2,1, 'TileSpacing','none','Padding','none');
+titles = ["Shallow","Deep"];
 %figure('Position',[100,100,500,500]);
 for j = 1:length(GLs) % iterate over grounding line depths
     ctrl_folder_dir = ctrl_folder_dir_groups{j};
     md_count = 0;
-
+    
     nexttile
     for i = 1:size(ctrl_folder_dir,1)
         md_count = md_count + 1;
@@ -142,10 +143,13 @@ for j = 1:length(GLs) % iterate over grounding line depths
     end
     ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
     xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
+    text(0.7, 7.5, titles(j),'Interpreter','latex','FontSize',15)
 end
 exportgraphics(gcf,'plots/ctrl_travel_time.pdf','ContentType','vector')
 %% For experiment
 tiledlayout(2,1, 'TileSpacing','none','Padding','none');
+titles = ["Shallow","Deep"];
+
 hCopys = []; % storing the scatter elements
 kin_wave_vels = zeros(length(GLs)*size(expt_folder_dir,1), 4); % 4 columns: width, depth, coef, slope
 %figure('Position',[100,100,500,500]);
@@ -236,6 +240,8 @@ for j = 1:length(GLs) % iterate over grounding line depths
     end
     ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
     xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
+    text(0.7, 7.5, titles(j),'Interpreter','latex','FontSize',15)
+
 end
 exportgraphics(gcf,'plots/mu_travel_time.pdf','ContentType','vector')
 

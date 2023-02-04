@@ -6,7 +6,7 @@
 
 %% Experiment with polynomial de-trending
 pulse_type = 'Diffu'; % types: "Diffu","Pulse"
-geom_type = 'shallow'; % types: "deep", "shallow"
+geom_type = 'deep'; % types: "deep", "shallow"
 
 % model parameters and plot parameters
 % read in the model parameter table
@@ -68,7 +68,7 @@ gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
 % iterate over deep or shallow GL models
-for j = 9
+for j = 7
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -103,7 +103,7 @@ for j = 9
     % we reshape x,y into a long vector and after decomposed return to a map
     xl = size(md_grid,1); yl = size(md_grid,2); nt = size(md_grid,3);
     md_grid_v = transpose(reshape(md_grid, [xl*yl, size(md_grid,3)]));
-    STs = detrend(md_grid_v, 18);
+    STs = detrend(md_grid_v, 18); 
     LTs = md_grid_v - STs;
     LTs = reshape(LTs, [nt, xl, yl]);
     STs = reshape(STs, [nt, xl, yl]);
