@@ -1,5 +1,151 @@
-% In this script, we analyze the force balance of two selected glaciers
-% we plot (in GIFs) the force balance of two models side by side
+%% force balance
+% here we find the change in fractional basal resistive stress at the end
+% of the perturbation. 
+% Unlike th old code, we right now ignore the longitudinal and the lateral
+% resistive stress; also we look at all the models rather than 2
+geom_type = "deep"; % options: "deep" or "shallow"
+ds = 50; % grid size for the regular grid
+front_x = 56650; % terminus distance to x = 0
+
+% model parameters and plot parameters
+% read in the model parameter table
+md_vars = readtable('md_var_combinations.csv');
+Ws = sort(unique(md_vars.('fjord_width')));
+GLs = sort(unique(md_vars.('delta_groundingline_depth')));
+FCs = sort(unique(md_vars.('background_friccoef')));
+md_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+% get all model foldernames
+foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
+foldernames_tbl = struct2table(foldernames);
+bools = cellfun(@(s) ~strcmp(s(1),'.'), foldernames_tbl.name);
+foldernames_tbl = foldernames_tbl(bools,:);
+
+% split the folder_dir into two groups, separated by grounding line depth
+folder_dir_groups = cell(1,2);
+for i = 1:length(GLs)
+    % skip the irrelevant ones
+    GL_bool = zeros(size(foldernames_tbl,1),1);
+    for j = 1:size(foldernames_tbl.name)
+        GL_bool(j) = compare_GLvalue(foldernames_tbl.name(j), GLs(i));
+    end
+    % save the respective folder items to a cell
+    folder_dir_groups{i} = foldernames_tbl(find(GL_bool),:); %#ok<FNDSB> 
+end
+
+% we divide the dicussions by the grounding line depth
+[~, shallowGL_i] = min(GLs);
+[~, deeperGL_i]  = max(GLs);
+n_simu = size(folder_dir_groups{shallowGL_i}, 1);
+
+switch geom_type
+    case 'deep'
+        geom_i = deeperGL_i;
+    case 'shallow'
+        geom_i = shallowGL_i;
+    otherwise
+        warning('unknown depth specification!')
+end
+
+fb_ratio = cell(2,n_simu);
+for j = 1:n_simu
+    % read the model
+    group = folder_dir_groups{geom_i};
+    md = load([group.folder{j},'/', group.name{j}, '/', md_name]).md;
+    index = md.mesh.elements;
+    %compute nodal functions coefficients N(x,y)=alpha x + beta y +gamma
+    [alpha, beta]=GetNodalFunctionsCoeff(index,md.mesh.x,md.mesh.y);
+    summation=[1;1;1];
+    
+    nt = size(md.results.TransientSolution,2);
+    Lx = max(md.mesh.x);
+    Ly = max(md.mesh.y);
+    ds = 50;
+    x = 0:ds:Lx;
+    y = 0:ds:Ly;
+    [X,~] = meshgrid(x, y);
+    if rem(size(X,1), 2) == 0
+        mid_i = size(X,1)/2;
+    else
+        mid_i = (size(X,1)+1)/2;
+    end
+    thalweg_x = X(mid_i,:);
+
+    % get H from vertices to elements
+    % timesteps we look at: first and last
+    timesteps = [1, size(md.results.TransientSolution,2)];
+    for ti = 1:length(timesteps)
+        t = timesteps(ti);
+        % basal stress; get onto elements
+        if size(md.friction.C,2) == 1
+            % no sliding law coefficient change
+            bs = md.friction.C.^2.*md.results.TransientSolution(t).Vel/md.constants.yts;
+        else
+            % mass unloading experiment
+            bs = md.friction.C(1:end-1,t).^2.*md.results.TransientSolution(t).Vel/md.constants.yts;
+        end
+        bs_list = bs(index);
+        basal_R = mean(bs_list,2);
+        % lateral
+        n = 3;
+        Rxx = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(2*md.results.TransientSolution(t).StrainRatexx +   md.results.TransientSolution(t).StrainRateyy);
+        Ryy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(  md.results.TransientSolution(t).StrainRatexx + 2*md.results.TransientSolution(t).StrainRateyy);
+        Rxy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*md.results.TransientSolution(t).StrainRatexy;
+        % driving stress
+        driving_S = drivingstress_from_results(md, t);
+        
+        % make floating part NaN
+        mask = md.results.TransientSolution(t).MaskOceanLevelset;
+        %basal_R(mask<0) = nan;
+
+        % make grid
+        Lx = max(md.mesh.x);
+        Ly = max(md.mesh.y);
+        ds = 50;
+        x = 0:ds:Lx;
+        y = 0:ds:Ly;
+        [X,~] = meshgrid(x, y);
+        if rem(size(X,1), 2) == 0
+            mid_i = size(X,1)/2;
+        else
+            mid_i = (size(X,1)+1)/2;
+        end
+        thalweg_x = X(mid_i,:);
+        % interp onto grids
+        [driving_S, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, driving_S, ds);
+        [basal_R, ~, ~]   = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, basal_R, ds);
+        [Rxx, ~, ~]       = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxx, ds);
+        [Ryy, ~, ~]       = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Ryy, ds);
+        [Rxy, x, y]       = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxy, ds);
+        % smooth (along-flow direction) the driving stress at length scale
+        % of 1 km
+        n_ds = 1000/ds;
+        driving_S_smooth = movmean(driving_S, n_ds, 2); % smooth() averages along each column vector
+        %driving_S_smooth = imgaussfilt(driving_S, n_ds);
+        
+        % save
+        % first row: first time step; second row: last time step
+        fb_ratio{ti,j} = basal_R./driving_S_smooth; 
+    end
+end
+
+%% plot t = 1 and t = end
+% t = 1
+figure('Position',[100,100,800,300]);
+tiledlayout(3,3,'TileSpacing','none')
+for i = 1:n_simu
+    nexttile
+    imagesc(fb_ratio{1,i});
+    clim([0,1])
+end
+
+figure('Position',[600,100,800,300]);
+tiledlayout(3,3,'TileSpacing','none')
+for i = 1:n_simu
+    nexttile
+    imagesc(fb_ratio{2,i});
+    clim([0,1])
+end
+%% Old force balance script
 md1_name = "model_W5000_GL0_FC120000";
 md2_name = "model_W5000_GL0_FC30000";
 model_type = "MISMIP_yangTransient_Calving_MassUnloading.mat";
@@ -7,7 +153,6 @@ md1 = load("long_models_yang/" + md1_name + "/" + model_type).md;
 md2 = load("long_models_yang/" + md2_name + "/" + model_type).md;
 mds = [md1, md2];
 
-gif('plots/force_balance_planview.gif')
 figure;
 for md_i = 1:length(mds)
     md = mds(md_i);
@@ -38,6 +183,7 @@ for md_i = 1:length(mds)
         linspace(red(3),sth(3),color_length)'];
     fb_ratio_last = 0;
     iter_count = 0;
+
     % iterate over time
     for i = 30:5:nt
         iter_count = iter_count + 1;

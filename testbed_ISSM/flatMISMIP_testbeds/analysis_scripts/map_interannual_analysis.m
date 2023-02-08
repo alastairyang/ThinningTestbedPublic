@@ -44,10 +44,6 @@ end
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
 
-%% specify the model you want to plot from
-
-% iterate over Deep GL models
-%tiledlayout(3,3,'TileSpacing','tight')
 switch geom_type
     case 'deep'
         geom_i = deeperGL_i;
@@ -67,8 +63,7 @@ LTs_cl = zeros(n_simu, 1200);
 gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
-% iterate over deep or shallow GL models
-for j = 7
+for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;

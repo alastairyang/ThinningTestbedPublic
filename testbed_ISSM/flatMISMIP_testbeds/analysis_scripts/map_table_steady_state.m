@@ -48,7 +48,6 @@ md_params = table('Size',md_size, 'VariableTypes', md_vartypes, 'VariableNames',
 
 % extrac data
 for i = 1:length(GLs) % iterate over the two grounding line depths
-    
     for j = 1:n_simu % iterate over different width and sliding law coef
         % read the model
         group = folder_dir_groups{i};
@@ -59,6 +58,9 @@ for i = 1:length(GLs) % iterate over the two grounding line depths
         base = md.results.TransientSolution(end).Base;
         % get the sliding law coefficient and calculate the basal drag
         tau_b = md.friction.C.^2.*(vel/md.constants.yts);
+        mask = md.results.TransientSolution(end).MaskOceanLevelset;
+        tau_b(mask<0) = nan;
+        
         % interp to regular grid
         [vels{i,j}, ~, ~]  = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, vel, ds);
         [hs{i,j}, ~, ~]    = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, h, ds);
@@ -155,64 +157,125 @@ writetable(ss_mean_tbl, 'result_tables/ss_md_field_means.csv')
 
 %% make a tiled plot
 %% velocity
-fig_name = ['vel_',geom_type,'.pdf'];
-figure('Position',[100,100,1000,500])
-tiledlayout(3,3, "TileSpacing","none")
-for j = 1:n_simu
-    nexttile
-    imagesc(x,y,log10(vels{j})); hold on
-    clim([0,4])
-    set(gca, 'xtick',[])
-    set(gca, 'ytick',[])
-    % add grounding line position
-    scatter(gls{j}.x, gls{j}.y,8,'filled','r'); hold off
+fig_name = 'vel.svg';
+f = figure('Position',[100,100,1000,500]);
+
+p1=uipanel('parent',f);
+p2=uipanel('parent',f);
+p1.Title=("Shallow"); p1.BackgroundColor = 'w';
+p2.Title=("Deep");    p2.BackgroundColor = 'w';
+p1.Position=[0,0.5,1,0.5]; 
+p2.Position=[0,0,1,0.5];
+T1=tiledlayout(p1,3,3,'TileSpacing','none');
+T2=tiledlayout(p2,3,3,'TileSpacing','none');
+% colorbar range
+cb_top = 4; cb_btm = 0;
+
+plot_md_i = 0;
+for i = 1:length(GLs)
+    for j = 1:n_simu
+        plot_md_i = plot_md_i + 1;
+        if plot_md_i > 9
+            nexttile(T2)
+        else
+            nexttile(T1)
+        end
+        imagesc(x,y,log10(vels{i,j})); hold on
+        clim([cb_btm, cb_top])
+        set(gca, 'xtick',[])
+        set(gca, 'ytick',[])
+        % add grounding line position
+        scatter(gls{i,j}.x, gls{i,j}.y,8,'filled','r'); hold off
+    end
 end
-colorbar_ticks = 0:4;
+colorbar_ticks = cb_btm:cb_top;
 cb = colorbar;
 cb.Layout.Tile = 'east';
 cb.Ticks = colorbar_ticks;
 cb.TickLabels = 10.^colorbar_ticks;
-exportgraphics(gcf, ['plots/steady_state/',fig_name],'ContentType','vector')
-
+cb.Label.String = 'Meter per year';
+%exportgraphics(f, ['plots/steady_state/',fig_name],'ContentType','vector')
+save_dir = ['plots/steady_state/',fig_name];
+export_fig(save_dir)
 %% Thickness
-fig_name = ['h_',geom_type,'.pdf'];
-figure('Position',[100,100,1000,500])
-tiledlayout(3,3, "TileSpacing","none")
-for j = 1:n_simu
-    nexttile
-    imagesc(x,y,hs{j}); hold on
-    clim([0,800])
-    set(gca, 'xtick',[])
-    set(gca, 'ytick',[])
-    % add grounding line position
-    scatter(gls{j}.x, gls{j}.y,8,'filled','r'); hold off
+fig_name = 'h.svg';
+f = figure('Position',[100,100,1000,500]);
+p1=uipanel('parent',f);
+p2=uipanel('parent',f);
+p1.Title=("Shallow"); p1.BackgroundColor = 'w';
+p2.Title=("Deep");    p2.BackgroundColor = 'w';
+p1.Position=[0,0.5,1,0.5]; 
+p2.Position=[0,0,1,0.5];
+T1=tiledlayout(p1,3,3,'TileSpacing','none');
+T2=tiledlayout(p2,3,3,'TileSpacing','none');
+
+plot_md_i = 0;
+for i = 1:length(GLs)
+    for j = 1:n_simu
+        plot_md_i = plot_md_i + 1;
+        if plot_md_i > 9
+            nexttile(T2)
+        else
+            nexttile(T1)
+        end
+        imagesc(x,y,hs{i,j}); hold on
+        clim([0,800])
+        set(gca, 'xtick',[])
+        set(gca, 'ytick',[])
+        % add grounding line position
+        scatter(gls{i,j}.x, gls{i,j}.y,8,'filled','r'); hold off
+    end
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
-exportgraphics(gcf, ['plots/steady_state/',fig_name],'ContentType','vector')
-
+cb.Label.String = 'Meter';
+%exportgraphics(gcf, ['plots/steady_state/',fig_name],'ContentType','vector')
+save_dir = ['plots/steady_state/',fig_name];
+export_fig(save_dir)
 %% basal drag
-fig_name = ['taub_',geom_type,'.pdf'];
-figure('Position',[100,100,1000,500])
-tiledlayout(3,3, "TileSpacing","none")
-for j = 1:n_simu
-    nexttile
-    imagesc(x,y,tau_bs{j}); hold on
-    clim([5e4,3e5])
-    set(gca, 'xtick',[])
-    set(gca, 'ytick',[])
-    % add grounding line position
-    scatter(gls{j}.x, gls{j}.y,8,'filled','r'); hold off
-end
-cb = colorbar;
-cb.Layout.Tile = 'east';
-exportgraphics(gcf, ['plots/steady_state/',fig_name],'ContentType','vector')
+fig_name = 'tau_b.svg';
+f = figure('Position',[100,100,1000,500]);
+p1=uipanel('parent',f);
+p2=uipanel('parent',f);
+p1.Title=("Shallow"); p1.BackgroundColor = 'w';
+p2.Title=("Deep");    p2.BackgroundColor = 'w';
+p1.Position=[0,0.5,1,0.5]; 
+p2.Position=[0,0,1,0.5];
+T1=tiledlayout(p1,3,3,'TileSpacing','none');
+T2=tiledlayout(p2,3,3,'TileSpacing','none');
+% colorbar range
+cb_up = 5.5; cb_btm = 3;
 
+plot_md_i = 0;
+for i = 1:length(GLs)
+    for j = 1:n_simu
+        plot_md_i = plot_md_i + 1;
+        if plot_md_i > 9
+            nexttile(T2)
+        else
+            nexttile(T1)
+        end
+        imagesc(x,y,log10(tau_bs{i,j})); hold on
+        clim([cb_btm, cb_up])
+        set(gca, 'xtick',[])
+        set(gca, 'ytick',[])
+        % add grounding line position
+        scatter(gls{i,j}.x, gls{i,j}.y,8,'filled','r'); hold off
+    end
+end
+colorbar_ticks = cb_btm:cb_up;
+cb = colorbar;
+cb.Ticks = colorbar_ticks;
+cb.Layout.Tile = 'east';
+cb.Label.String = 'Pascal';
+cb.TickLabels = 10.^colorbar_ticks;
+%exportgraphics(gcf, ['plots/steady_state/',fig_name],'ContentType','vector')
+save_dir = ['plots/steady_state/',fig_name];
+export_fig(save_dir)
 %% Appendix: function
 function [min_data, max_data, mean_data] = crop_domain_stats(data, W, L, front_x, ds, x, y)
-%CROP_DOMAIN_STATS This function takes the given data (can be ice
-%thickness or velocity etc, but need to be defined on a regular mesh), crop
-%out the central portion specified by the width and length, and calculate
+%CROP_DOMAIN_STATS This function takes the given data (defined on a regular
+%mesh), crops out the central portion specified by the width and length, and calculate
 %the statistics of the data in the region (min, max, and mean values). x is
 %the along flow direction (left to right) and y is the across-flow
 %direction (bottom to top)

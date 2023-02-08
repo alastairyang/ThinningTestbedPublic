@@ -52,8 +52,8 @@ end
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
 
-% shallower grounding line
 n_simu = size(folder_dir_groups{shallowGL_i}, 1);
+
 % pre-allocate
 deltaH_ctrl = cell(n_simu, 2);
 deltaH_expt = cell(n_simu, 2);
