@@ -47,7 +47,7 @@ switch geom_type
 end
 
 fb_ratio = cell(2,n_simu);
-for j = 1:n_simu
+for j = 9
     % read the model
     group = folder_dir_groups{geom_i};
     md = load([group.folder{j},'/', group.name{j}, '/', md_name]).md;
@@ -75,6 +75,11 @@ for j = 1:n_simu
     timesteps = [1, size(md.results.TransientSolution,2)];
     for ti = 1:length(timesteps)
         t = timesteps(ti);
+        % ice thickness
+        H = md.results.TransientSolution(t).Thickness;
+        H_list = H(index);
+        H_list = mean(H_list,2);
+
         % basal stress; get onto elements
         if size(md.friction.C,2) == 1
             % no sliding law coefficient change
@@ -90,6 +95,17 @@ for j = 1:n_simu
         Rxx = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(2*md.results.TransientSolution(t).StrainRatexx +   md.results.TransientSolution(t).StrainRateyy);
         Ryy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(  md.results.TransientSolution(t).StrainRatexx + 2*md.results.TransientSolution(t).StrainRateyy);
         Rxy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*md.results.TransientSolution(t).StrainRatexy;
+        Rxxlist = Rxx(index);
+        Ryylist = Ryy(index);
+        Rxylist = Rxy(index);
+        % take the spatial derivative -> stress gradient
+        % We use the same convention as in Carahan et al., 2022 and
+        % multiply by -1
+%         dRxxdx=-1*(Rxxlist.*H_list.*alpha)*summation;
+%         dRxydy=-1*(Rxylist.*H_list.*beta)*summation;    
+        %dRxxdy=(Rxxlist.*H_list.*beta)*summation;
+        %dRxydx=(Rxylist.*H_list.*alpha)*summation;
+        
         % driving stress
         driving_S = drivingstress_from_results(md, t);
         
@@ -113,9 +129,8 @@ for j = 1:n_simu
         % interp onto grids
         [driving_S, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, driving_S, ds);
         [basal_R, ~, ~]   = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, basal_R, ds);
-        [Rxx, ~, ~]       = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxx, ds);
-        [Ryy, ~, ~]       = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Ryy, ds);
-        [Rxy, x, y]       = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxy, ds);
+%         [dRxxdx, ~, ~]    = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, dRxxdx, ds);
+%         [dRxydy, x, y]    = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, dRxydy, ds);
         % smooth (along-flow direction) the driving stress at length scale
         % of 1 km
         n_ds = 1000/ds;
@@ -145,7 +160,7 @@ for i = 1:n_simu
     imagesc(fb_ratio{2,i});
     clim([0,1])
 end
-%% Old force balance script
+%% APPENDIX: Old force balance script
 md1_name = "model_W5000_GL0_FC120000";
 md2_name = "model_W5000_GL0_FC30000";
 model_type = "MISMIP_yangTransient_Calving_MassUnloading.mat";
