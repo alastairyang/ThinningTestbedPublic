@@ -7,6 +7,7 @@
 %% Experiment with polynomial de-trending
 pulse_type = 'Diffu'; % types: "Diffu","Pulse"
 geom_type = 'deep'; % types: "deep", "shallow"
+expt_type = 'no_mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
 
 % model parameters and plot parameters
 % read in the model parameter table
@@ -14,8 +15,6 @@ md_vars = readtable('md_var_combinations.csv');
 Ws = sort(unique(md_vars.('fjord_width')));
 GLs = sort(unique(md_vars.('delta_groundingline_depth')));
 FCs = sort(unique(md_vars.('background_friccoef')));
-ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
-expt_name = ['MISMIP_yangTransient_Calving_',pulse_type,'GaussianPerturb_8.mat'];
 % get all model foldernames
 foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
 foldernames_tbl = struct2table(foldernames);
@@ -51,6 +50,17 @@ switch geom_type
         geom_i = shallowGL_i;
     otherwise
         warning('unknown depth specification!')
+end
+
+switch expt_type
+    case 'no_mu'
+        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        expt_name = ['MISMIP_yangTransient_Calving_',pulse_type,'GaussianPerturb_8.mat'];
+    case 'mu'
+        ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+        expt_name = ['MISMIP_yangTransient_Calving_MassUnloading_',pulse_type,'GaussianPerturb_8.mat'];
+    otherwise
+        error('Unknown experiment type!')
 end
 
 n_simu = size(folder_dir_groups{geom_i}, 1);
@@ -165,6 +175,7 @@ wid_eff_factor = 4; % 4 times the sigma (in the gaussian width)
 
 figure('Position',[100,100,800,600])
 tiledlayout(2,1,'TileSpacing','none')
+% cyclic component
 nexttile
 for i = 1:n_simu
     % make a new along flow x axis that have the x positions of the
@@ -199,6 +210,7 @@ text_y = ylim_up - 1;
 text(text_x, text_y, 'Cyclic magnitude','Interpreter','latex','FontSize',13)
 ylabel('Elevation change (m)','Interpreter','latex','FontSize',13)
 
+% Trend component
 nexttile
 for i = 1:n_simu
     % make a new along flow x axis that have the x positions of the
@@ -233,7 +245,7 @@ ylabel('Elevation change (m)','Interpreter','latex','FontSize',13)
 text_x = 1;
 text_y = ylim_up-1;
 text(text_x, text_y, 'Total thinning in trend component','Interpreter','latex','FontSize',13);
-plot_name = ['plots/local_basal_profile_', pulse_type, '_', geom_type, '.png'];
+plot_name = ['plots/local_basal_profile_', expt_type,'_',pulse_type, '_', geom_type, '.png'];
 exportgraphics(gcf, plot_name ,'Resolution',300)
 
 

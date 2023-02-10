@@ -46,7 +46,10 @@ switch geom_type
         warning('unknown depth specification!')
 end
 
-fb_ratio = cell(2,n_simu);
+% save the force balance field data
+driving_S_all = cell(2, n_simu);
+longi_grad_all = cell(2, n_simu);
+later_grad_all = cell(2, n_simu);
 for j = 9
     % read the model
     group = folder_dir_groups{geom_i};
@@ -95,16 +98,6 @@ for j = 9
         Rxx = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(2*md.results.TransientSolution(t).StrainRatexx +   md.results.TransientSolution(t).StrainRateyy);
         Ryy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(  md.results.TransientSolution(t).StrainRatexx + 2*md.results.TransientSolution(t).StrainRateyy);
         Rxy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*md.results.TransientSolution(t).StrainRatexy;
-        Rxxlist = Rxx(index);
-        Ryylist = Ryy(index);
-        Rxylist = Rxy(index);
-        % take the spatial derivative -> stress gradient
-        % We use the same convention as in Carahan et al., 2022 and
-        % multiply by -1
-%         dRxxdx=-1*(Rxxlist.*H_list.*alpha)*summation;
-%         dRxydy=-1*(Rxylist.*H_list.*beta)*summation;    
-        %dRxxdy=(Rxxlist.*H_list.*beta)*summation;
-        %dRxydx=(Rxylist.*H_list.*alpha)*summation;
         
         % driving stress
         driving_S = drivingstress_from_results(md, t);
@@ -129,17 +122,39 @@ for j = 9
         % interp onto grids
         [driving_S, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, driving_S, ds);
         [basal_R, ~, ~]   = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, basal_R, ds);
-%         [dRxxdx, ~, ~]    = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, dRxxdx, ds);
-%         [dRxydy, x, y]    = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, dRxydy, ds);
         % smooth (along-flow direction) the driving stress at length scale
         % of 1 km
         n_ds = 1000/ds;
         driving_S_smooth = movmean(driving_S, n_ds, 2); % smooth() averages along each column vector
         %driving_S_smooth = imgaussfilt(driving_S, n_ds);
+
+        % calculate longitudinal and lateral stress gradient
+        % we notice that taking derivative with the raw Rxx and Rxy gives
+        % very noisy results. To mitigate, we first interpolate onto a
+        % coarse grid and then interpolate to a finer grid
+        % with cubic spline, then finally take derivative with five-point stencil.
+        ds = 200;
+        [Rxxgrid,~,~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxx, ds);
+        [Rxygrid,~,~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxy, ds);
+        [Hgrid,x,y] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, H, ds);
+        ds = 50; % back to higher resolution
+        % get the new meshgrid
+        [~,xq,yq] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, H, ds);
+        [X,Y] = meshgrid(x,y);
+        [Xq, Yq] = meshgrid(xq, yq);
+        Rxxgrid_interp = interp2(X,Y,Rxxgrid,Xq,Yq,'spline');
+        Rxygrid_interp = interp2(X,Y,Rxygrid,Xq,Yq,'spline');
+        Hgrid_interp   = interp2(X,Y,Hgrid,Xq,Yq, 'spine');
+        % take spatial derivative with five-point stencile for higher
+        % accuracy
+        longi_grad = -1*five_point_stencil(Rxxgrid_interp.*Hgrid_interp, ds, 2);
+        later_grad = -1*five_point_stencil(Rxygrid_interp.*Hgrid_interp, ds, 1);
         
         % save
         % first row: first time step; second row: last time step
-        fb_ratio{ti,j} = basal_R./driving_S_smooth; 
+        driving_S_all{ti,j} = basal_R./driving_S_smooth; 
+        longi_grad_all{ti,j} = longi_grad;
+        later_grad_all{ti,j} = later_grad;
     end
 end
 
