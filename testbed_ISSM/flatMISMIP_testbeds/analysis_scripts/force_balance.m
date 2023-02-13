@@ -50,6 +50,7 @@ end
 driving_S_all = cell(2, n_simu);
 longi_grad_all = cell(2, n_simu);
 later_grad_all = cell(2, n_simu);
+basal_R_all = cell(2, n_simu);
 for j = 9
     % read the model
     group = folder_dir_groups{geom_i};
@@ -59,102 +60,38 @@ for j = 9
     [alpha, beta]=GetNodalFunctionsCoeff(index,md.mesh.x,md.mesh.y);
     summation=[1;1;1];
     
-    nt = size(md.results.TransientSolution,2);
-    Lx = max(md.mesh.x);
-    Ly = max(md.mesh.y);
-    ds = 50;
-    x = 0:ds:Lx;
-    y = 0:ds:Ly;
-    [X,~] = meshgrid(x, y);
-    if rem(size(X,1), 2) == 0
-        mid_i = size(X,1)/2;
-    else
-        mid_i = (size(X,1)+1)/2;
-    end
-    thalweg_x = X(mid_i,:);
-
     % get H from vertices to elements
     % timesteps we look at: first and last
     timesteps = [1, size(md.results.TransientSolution,2)];
     for ti = 1:length(timesteps)
         t = timesteps(ti);
-        % ice thickness
-        H = md.results.TransientSolution(t).Thickness;
-        H_list = H(index);
-        H_list = mean(H_list,2);
-
-        % basal stress; get onto elements
-        if size(md.friction.C,2) == 1
-            % no sliding law coefficient change
-            bs = md.friction.C.^2.*md.results.TransientSolution(t).Vel/md.constants.yts;
-        else
-            % mass unloading experiment
-            bs = md.friction.C(1:end-1,t).^2.*md.results.TransientSolution(t).Vel/md.constants.yts;
-        end
-        bs_list = bs(index);
-        basal_R = mean(bs_list,2);
-        % lateral
-        n = 3;
-        Rxx = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(2*md.results.TransientSolution(t).StrainRatexx +   md.results.TransientSolution(t).StrainRateyy);
-        Ryy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*(  md.results.TransientSolution(t).StrainRatexx + 2*md.results.TransientSolution(t).StrainRateyy);
-        Rxy = md.materials.rheology_B.*md.results.TransientSolution(t).StrainRateeffective.^(1/n-1).*md.results.TransientSolution(t).StrainRatexy;
-        
-        % driving stress
-        driving_S = drivingstress_from_results(md, t);
-        
-        % make floating part NaN
-        mask = md.results.TransientSolution(t).MaskOceanLevelset;
-        %basal_R(mask<0) = nan;
-
-        % make grid
-        Lx = max(md.mesh.x);
-        Ly = max(md.mesh.y);
-        ds = 50;
-        x = 0:ds:Lx;
-        y = 0:ds:Ly;
-        [X,~] = meshgrid(x, y);
-        if rem(size(X,1), 2) == 0
-            mid_i = size(X,1)/2;
-        else
-            mid_i = (size(X,1)+1)/2;
-        end
-        thalweg_x = X(mid_i,:);
-        % interp onto grids
-        [driving_S, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, driving_S, ds);
-        [basal_R, ~, ~]   = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, basal_R, ds);
-        % smooth (along-flow direction) the driving stress at length scale
-        % of 1 km
-        n_ds = 1000/ds;
-        driving_S_smooth = movmean(driving_S, n_ds, 2); % smooth() averages along each column vector
-        %driving_S_smooth = imgaussfilt(driving_S, n_ds);
-
-        % calculate longitudinal and lateral stress gradient
-        % we notice that taking derivative with the raw Rxx and Rxy gives
-        % very noisy results. To mitigate, we first interpolate onto a
-        % coarse grid and then interpolate to a finer grid
-        % with cubic spline, then finally take derivative with five-point stencil.
-        ds = 200;
-        [Rxxgrid,~,~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxx, ds);
-        [Rxygrid,~,~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, Rxy, ds);
-        [Hgrid,x,y] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, H, ds);
-        ds = 50; % back to higher resolution
-        % get the new meshgrid
-        [~,xq,yq] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, H, ds);
-        [X,Y] = meshgrid(x,y);
-        [Xq, Yq] = meshgrid(xq, yq);
-        Rxxgrid_interp = interp2(X,Y,Rxxgrid,Xq,Yq,'spline');
-        Rxygrid_interp = interp2(X,Y,Rxygrid,Xq,Yq,'spline');
-        Hgrid_interp   = interp2(X,Y,Hgrid,Xq,Yq, 'spine');
-        % take spatial derivative with five-point stencile for higher
-        % accuracy
-        longi_grad = -1*five_point_stencil(Rxxgrid_interp.*Hgrid_interp, ds, 2);
-        later_grad = -1*five_point_stencil(Rxygrid_interp.*Hgrid_interp, ds, 1);
-        
+        smooth_L = 1000;
+        [driving_S, basal_R, longi_grad, later_grad] = calc_force_balance(md,t,smooth_L);
         % save
         % first row: first time step; second row: last time step
-        driving_S_all{ti,j} = basal_R./driving_S_smooth; 
+        driving_S_all{ti,j} = driving_S; 
         longi_grad_all{ti,j} = longi_grad;
         later_grad_all{ti,j} = later_grad;
+        basal_R_all{ti,j} = basal_R;
+
+        % plotting code: plot the lateral and longitudinal resistive stress
+        % on one figure
+%         figure('Position',[100,100,1400,300]); 
+%         strs_bd = 1e5;
+%         subplot(1,2,1);imagesc(xq,yq,longi_grad);clim([-strs_bd, strs_bd]);
+%         subplot(1,2,2);imagesc(xq,yq,later_grad);clim([-strs_bd, strs_bd])
+%         colorbar
+
+%         % plotting code: plot the change in the lateral resistive stress 
+%         figure('Position',[100,100,600,200]); imagesc(x,y,later_grad_all{2,j}-later_grad_all{1,j}); clim([-8e4,8e4]); colorbar
+
+        % plot the fraction of basal to driving
+        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,basal_R_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,basal_R_all{2,j}./driving_S_all{2,j});clim([0,1])
+        % plot the fraction of longi_grad to driving
+        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,longi_grad_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,longi_grad_all{2,j}./driving_S_all{2,j});clim([0,1])
+        % plot the fraction of later_grad to driving
+        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,later_grad_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,later_grad_all{2,j}./driving_S_all{2,j});clim([0,1])
+
     end
 end
 
