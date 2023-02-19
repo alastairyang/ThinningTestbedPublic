@@ -66,7 +66,7 @@ for j = 9
     for ti = 1:length(timesteps)
         t = timesteps(ti);
         smooth_L = 1000;
-        [driving_S, basal_R, longi_grad, later_grad] = calc_force_balance(md,t,smooth_L);
+        [driving_S, basal_R, longi_grad, later_grad, x, y] = calc_force_balance(md,t,smooth_L);
         % save
         % first row: first time step; second row: last time step
         driving_S_all{ti,j} = driving_S; 
@@ -91,6 +91,11 @@ for j = 9
         %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,longi_grad_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,longi_grad_all{2,j}./driving_S_all{2,j});clim([0,1])
         % plot the fraction of later_grad to driving
         %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,later_grad_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,later_grad_all{2,j}./driving_S_all{2,j});clim([0,1])
+
+        % plot to validate that the force is in balance; use the first
+        % timestep
+        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,driving_S_all{1,j});clim([0,3e5]);subplot(2,1,2);imagesc(x,y,basal_R_all{1,j}+later_grad_all{1,j}+longi_grad_all{1,j}); clim([0,3e5])
+        
 
     end
 end

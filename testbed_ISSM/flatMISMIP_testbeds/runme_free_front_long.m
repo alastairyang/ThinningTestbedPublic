@@ -45,7 +45,8 @@ tic
 % start iteration
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
-for jj = md_idx
+% model iteration
+for jj = 16
 
     var_table = mdvar_combs(jj,:);
 
@@ -65,8 +66,8 @@ for jj = md_idx
         mkdir(foldername)
     end
 
-    % RUN
-    for steps = 10
+    % step iteration
+    for steps = 11
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -555,7 +556,8 @@ for jj = md_idx
             % add an initial time to the friction coef vector
             md.friction.C = [C0; next_start_time];
 
-            for it = 1:end_time/dt_mu                                
+            for it = 1:end_time/dt_mu            
+
                 results = md.results.TransientSolution;
                 % restart and specify sim duration
                 md = transientrestart(md);
@@ -582,6 +584,12 @@ for jj = md_idx
 
                 % save the new result to a separate var
                 new_results = [new_results,md.results.TransientSolution(1)];
+
+                % crop out any step outside step 10 to limit some weird
+                % over-stepping from ISSM when re-starting the run
+                result_tbl = struct2table(md.results.TransientSolution);
+                result_tbl = result_tbl(result_tbl.step <= 10, :);
+                md.results.TransientSolution = table2struct(result_tbl);
             end
             md.results = previous_results;
             md.results.TransientSolution = new_results;
@@ -1205,22 +1213,44 @@ for jj = md_idx
 
                 % solve
                 md = solve(md,'tr');
-                
-                if it_count == 10 || it == 1 % save every 10 time steps (every 0.1 year) & save the first time
+
+                if it == 1 % save the first time
                     it_count = 0;
                     new_results = [new_results, md.results.TransientSolution(1)];
-                    % remove the extra fields
+                    % Retain only "TransientSolution"
                     names = fieldnames(md.results);
                     results_cell = struct2cell(md.results);
                     md.results = cell2struct(results_cell(names == "TransientSolution"),...
                                              names(names == "TransientSolution"));
                     clear names results_cell
                 end
+                
+                if it_count == 10 % save every 10 time steps (every 0.1 year)
+                    it_count = 0;
+
+                    % crop out any step other than step 1 to limit some weird
+                    % over-stepping from ISSM
+                    if ~all(size(md.results.TransientSolution)==[1,1]) % more than one md.results.TransientSolution is generated
+                        result_tbl = struct2table(md.results.TransientSolution);
+                        % save timesteps
+                        result_tbl = result_tbl(result_tbl.step == 1, :);
+                        md.results.TransientSolution = table2struct(result_tbl);
+                    end
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                    % Retain only "TransientSolution"
+                    names = fieldnames(md.results);
+                    results_cell = struct2cell(md.results);
+                    md.results = cell2struct(results_cell(names == "TransientSolution"),...
+                                             names(names == "TransientSolution"));
+                    clear names results_cell result_tbl
+                end
             end
             md.results = previous_results;
             md.results.TransientSolution = new_results;
 
             savemodel(org, md);
+            % save timestep record
+            save("timestep_record.mat", "timestep_record")
 
             % run time in seconds, print in minutes
             runTime = toc;
@@ -1415,15 +1445,35 @@ for jj = md_idx
                 % solve
                 md = solve(md,'tr');
                 
-                if it_count == 10 || it == 1 % save every 10 time steps (every 0.1 year)
+                if it == 1 % save the first time
                     it_count = 0;
                     new_results = [new_results, md.results.TransientSolution(1)];
-                    % remove the extra fields
+                    % Retain only "TransientSolution"
                     names = fieldnames(md.results);
                     results_cell = struct2cell(md.results);
                     md.results = cell2struct(results_cell(names == "TransientSolution"),...
                                              names(names == "TransientSolution"));
                     clear names results_cell
+                end
+                
+                if it_count == 10 % save every 10 time steps (every 0.1 year)
+                    it_count = 0;
+
+                    % crop out any step other than step 1 to limit some weird
+                    % over-stepping from ISSM
+                    if ~all(size(md.results.TransientSolution)==[1,1]) % more than one md.results.TransientSolution is generated
+                        result_tbl = struct2table(md.results.TransientSolution);
+                        % save timesteps
+                        result_tbl = result_tbl(result_tbl.step == 1, :);
+                        md.results.TransientSolution = table2struct(result_tbl);
+                    end
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                    % Retain only "TransientSolution"
+                    names = fieldnames(md.results);
+                    results_cell = struct2cell(md.results);
+                    md.results = cell2struct(results_cell(names == "TransientSolution"),...
+                                             names(names == "TransientSolution"));
+                    clear names results_cell result_tbl
                 end
             end
             md.results = previous_results;

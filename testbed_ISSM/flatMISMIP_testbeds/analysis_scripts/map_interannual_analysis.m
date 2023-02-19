@@ -5,9 +5,10 @@
 % perturbation: the magnitude of cyclic and trend change
 
 %% Experiment with polynomial de-trending
-pulse_type = 'Diffu'; % types: "Diffu","Pulse"
-geom_type = 'deep'; % types: "deep", "shallow"
-expt_type = 'no_mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
+gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
+pulse_type = 'Pulse'; % types: "Diffu","Pulse"
+geom_type = 'shallow'; % types: "deep", "shallow"
+expt_type = 'mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
 
 % model parameters and plot parameters
 % read in the model parameter table
@@ -73,6 +74,168 @@ LTs_cl = zeros(n_simu, 1200);
 gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
+% Singular spectral analysis approach
+for j = 1
+    % read the model
+    group = folder_dir_groups{geom_i};
+    md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
+    md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
+    results_tbl_expt = struct2table(md_expt.results.TransientSolution);
+    results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
+    % get model information
+    modelname = md_ctrl.miscellaneous.name;
+    [W, GL, FC] = parse_modelname(modelname);
+    % isolate the delta H from localized basal perturbation
+    expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Surface{:}]', results_tbl_ctrl.time,'linear','extrap'));
+    deltaH = expt_H_interp - [results_tbl_ctrl.Surface{:}];
+    deltaH_cell = num2cell(deltaH,1);
+    [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, 50);
+    [mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, 50);
+    % permute
+    md_grid = permute(md_grid,[2,3,1]);
+    
+    % apply the last mask to data at all timesteps
+    mask = mask_grid(end,:,:);
+    for i = 1:size(md_grid,3)
+        md_temp = md_grid(:,:,i);
+        md_temp(mask >=0) = 0;
+        md_grid(:,:,i) = md_temp;
+    end
+
+    % obtain the last grounding line positions from both the control and
+    % experiment
+    gl_ctrl(j) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(end).MaskOceanLevelset);
+    gl_expt(j) = locate_groundingline(md_expt, md_expt.results.TransientSolution(end).MaskOceanLevelset);
+    % timeseries decomposition
+    % we reshape x,y into a long vector and after decomposed return to a map
+    xl = size(md_grid,1); yl = size(md_grid,2); nt = size(md_grid,3);
+
+    % Decompose the timeseries along the center flowline
+    % only look at the perturbation years
+    start_yr = 5;
+    end_yr = 21;
+    dt = 0.1;
+    mid_i = floor(size(md_grid,1)/2);
+    crop_ti = start_yr/dt:(end_yr/dt-1);
+    sel_xi  = 1:20:size(md_grid,2);
+    % crop out the extra time; select the equally spaced control points
+    md_grid_mid = squeeze(md_grid(mid_i,sel_xi,:));
+    md_grid_mid = md_grid_mid(:,crop_ti);
+    LTs = zeros(size(md_grid_mid,1), length(crop_ti));
+    % decomposition!
+    for i = 1:size(md_grid_mid,1)
+        [LT, ST] = trenddecomp(md_grid_mid(i,:));
+        LTs(i,:) = LT;
+    end
+    STs = md_grid_mid - LTs;
+    % color the lines by their distance to the gaussian perturbation
+    % and save the image
+    t_axis = linspace(start_yr, end_yr, size(LTs,2));
+    sel_x = x(sel_xi);
+    dist = sel_x - gauss_xloc; % positive: downstream
+    abs_dist = abs(dist);
+    unique_dist = unique(abs_dist);
+    % first plot downstream ones
+    color_length = length(unique_dist);
+    red = [255, 51, 153]/255;
+    sth = [153, 153, 255]/255;
+%     colors_p = [linspace(red(1),sth(1),color_length)',...
+%                 linspace(red(2),sth(2),color_length)',...
+%                 linspace(red(3),sth(3),color_length)'];
+    colors_p = cool(color_length);
+    colororder(colors_p)
+    % color: from nearest to the furthest
+    color_axis = transpose(linspace(min(abs_dist), max(abs_dist),length(dist))); % 10^0 to 10^4
+
+    figure('Position',[100,100,1100,500]);
+    % iterate over each line / control point
+    for i = 1:length(dist)
+        % Long term
+        subplot(2,2,[1,2])
+        line_color = interp1(color_axis, colors_p, abs_dist(i));
+        if dist(i) >= 0 % downstream
+            line_style = '-';
+        else % upstream
+            line_style = '--';
+        end
+        plot(t_axis, md_grid_mid(i,:),"Color",line_color,'LineStyle',line_style);
+        hold on
+
+        subplot(2,2,3)
+        line_color = interp1(color_axis, colors_p, abs_dist(i));
+        if dist(i) >= 0 % downstream
+            line_style = '-';
+        else % upstream
+            line_style = '--';
+        end
+        plot(t_axis, LTs(i,:),"Color",line_color,'LineStyle',line_style);
+        hold on
+
+        % short term
+        subplot(2,2,4)
+        plot(t_axis, STs(i,:),"Color",line_color,'LineStyle',line_style);
+        hold on
+    end
+    subplot(2,2,3);title('Long term'); xlabel('time');ylabel('m')
+    subplot(2,2,4);title('Short term'); xlabel('time');ylabel('m')
+    plot_title = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type,'.png'];
+    exportgraphics(gcf,['plots/pulse_mu_plots/',plot_title],'Resolution',300)
+
+    % plotting animation
+    [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
+    figure('Position',[100,100,1100,450]);
+    for i = 1:260
+        subplot(2,1,1);imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colorbar;
+        subplot(2,1,2);imagesc(x,y,squeeze(H_grid(i,:,:)));title(num2str(i/10));hold on; clim([0,800]); colorbar;
+        pause(0.05);
+    end
+
+    % plot the grounding line position over time
+    t_expt = results_tbl_expt.time;
+    t_ctrl = results_tbl_ctrl.time;
+    gls_expt = zeros(size(t_expt));
+    gls_ctrl = zeros(size(t_ctrl));
+    for i = 1:260
+        gls_expt(i) = locate_groundingline(md_expt, md_expt.results.TransientSolution(i).MaskOceanLevelset);
+        gls_ctrl(i) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset);
+    end
+    % interpolate
+    gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
+    gls_diff = gls_expt_interp - gls_ctrl;
+
+    figure;
+    plot(t_ctrl-t_ctrl(1), gls_diff)
+    
+
+    % find the snapshot of most thinning
+    
+%     % long term mean timeseries
+%     LTs_time_mean = squeeze(mean(LTs, [1,2]));
+%     LTs_time_min  = squeeze(min(LTs, [],[1,2]));
+%     
+%     md_name = md_ctrl.miscellaneous.name(9:end);
+%     % trend: find total delta H
+%     % cyclic: find range (max - min)
+%     last_LTs = -1*squeeze(LTs(:,:,end));
+%     STs_range = STs_max - STs_min;
+% 
+%     % get the corresponding symbols for this scatter plot
+%     W_symbs(j,1) = Ws_symb(W==Ws);
+%     FC_symbs(j,:) = FCs_symb(FC==FCs,:);
+%     % save the plot
+% %     save_dir = ['plots/diffu_mu_plots/',md_name,'.png'];
+% %     exportgraphics(gcf, save_dir, 'Resolution',300)
+%     disp(['model ',md_name,' is completed!'])
+% 
+%     % save the center flow line
+%     STs_cl(j,:) = STs_range(size(STs_range,1)/2,:);
+%     LTs_cl(j,:) = last_LTs(size(last_LTs,1)/2,:);
+
+    % report
+    disp(['model ',plot_title(1:end-4), ' is processed!'])
+end
+
+%% Detrending iteration
 for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
@@ -84,7 +247,8 @@ for j = 1:n_simu
     modelname = md_ctrl.miscellaneous.name;
     [W, GL, FC] = parse_modelname(modelname);
     % isolate the delta H from localized basal perturbation
-    deltaH = [results_tbl_expt.Thickness{:}] - [results_tbl_ctrl.Thickness{:}];
+    expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
+    deltaH = expt_H_interp - [results_tbl_ctrl.Thickness{:}];
     deltaMask = [results_tbl_expt.MaskOceanLevelset{:}] - [results_tbl_ctrl.MaskOceanLevelset{:}];
     deltaH_cell = num2cell(deltaH,1);
     [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, 50);
@@ -108,6 +272,8 @@ for j = 1:n_simu
     % we reshape x,y into a long vector and after decomposed return to a map
     xl = size(md_grid,1); yl = size(md_grid,2); nt = size(md_grid,3);
     md_grid_v = transpose(reshape(md_grid, [xl*yl, size(md_grid,3)]));
+
+
     STs = detrend(md_grid_v, 18); 
     LTs = md_grid_v - STs;
     LTs = reshape(LTs, [nt, xl, yl]);
@@ -117,7 +283,7 @@ for j = 1:n_simu
     STs = permute(STs, [2,3,1]);
     
     % animate
-%     figure;for i = 1:nt; imagesc(x,y,squeeze(LTs(:,:,i)));clim([-10,0]);pause(0.05);end
+%     figure('Position',[100,100,800,150]);for i = 1:nt; imagesc(x,y,squeeze(LTs(:,:,i)));clim([-10,0]);colorbar;pause(0.05);end 
 %     figure;for i = 1:nt; imagesc(x,y,squeeze(STs(:,:,i)));clim([-10,0]);pause(0.05);end
     
     % find the spatial mean and spatial std
@@ -165,9 +331,9 @@ for j = 1:n_simu
     % report
     disp(['model ', modelname(9:end),' type ',geom_type, ' is processed!'])
 end
-%% plot the along flow profile
+%% OUTDATED: accompanied plot for detrending method: plot the along flow profile
 ds = 50;
-ylim_up = 20;
+ylim_up = 25;
 % parameter for gaussian patch dimensions
 gauss_xloc = 3.2e4;
 gauss_width_ratio = 0.08;
@@ -259,22 +425,12 @@ md_expt = load('long_models_yang/model_W11000_GL400_FC120000/MISMIP_yangTransien
 md_ctrl = load('long_models_yang/model_W11000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
 results_tbl_expt = struct2table(md_expt.results.TransientSolution);
 results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
-deltaH = [results_tbl_expt.Thickness{:}] - [results_tbl_ctrl.Thickness{:}];
+expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
+deltaH = expt_H_interp - [results_tbl_ctrl.Thickness{:}];
+deltaMask = [results_tbl_expt.MaskOceanLevelset{:}] - [results_tbl_ctrl.MaskOceanLevelset{:}];
 deltaH_cell = num2cell(deltaH,1);
-
-% h_1st = results_tbl.Thickness(2:end);
-% h_2nd = results_tbl.Thickness(1:end-1);
-% dhdt = [h_2nd{:}] - [h_1st{:}];
-% % wrap into cell array
-% dhdt_cell = num2cell(dhdt,1);
-% clear dhdt
-% we need to transform to regular grid
 [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, 50);
-% suppress large dhdt due to frontal ablation
 [mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, 50);
-% dh/dt
-md_grid = md_grid(2:end,:,:) - md_grid(1:end-1,:,:);
-mask_grid = mask_grid(2:end,:,:);
 % permute
 md_grid = permute(md_grid,[2,3,1]);
 
@@ -292,43 +448,56 @@ end
 
 % Plot
 figure; 
-subplot(2,3,1); imagesc(x,y,eofmaps(:,:,1)); axis xy image off; cmocean('delta','pivot',0);
+subplot(2,5,1); imagesc(x, y,eofmaps(:,:,1)); axis xy image off; cmocean('delta','pivot',0);
 title('Mode 1')
-subplot(2,3,2); imagesc(x, y,eofmaps(:,:,2)); axis xy image off; cmocean('delta','pivot',0);
+subplot(2,5,2); imagesc(x, y,eofmaps(:,:,2)); axis xy image off; cmocean('delta','pivot',0);
 title('Mode 2')
-subplot(2,3,3); imagesc(x, y,eofmaps(:,:,3)); axis xy image off; cmocean('delta','pivot',0);
+subplot(2,5,3); imagesc(x, y,eofmaps(:,:,3)); axis xy image off; cmocean('delta','pivot',0);
 title('Mode 3')
+subplot(2,5,4); imagesc(x, y,eofmaps(:,:,4)); axis xy image off; cmocean('delta','pivot',0);
+title('Mode 4')
+subplot(2,5,5); imagesc(x, y,eofmaps(:,:,5)); axis xy image off; cmocean('delta','pivot',0);
+title('Mode 5')
 % temporal evolution
-subplot(2,3,4); anomaly(0:0.1:25.9-0.1,pc(1,:));
-subplot(2,3,5); anomaly(0:0.1:25.9-0.1,pc(2,:));
-subplot(2,3,6); anomaly(0:0.1:25.9-0.1,pc(3,:));
+t = linspace(0,26,size(pc,2));
+subplot(2,5,6); anomaly(t,pc(1,:));
+subplot(2,5,7); anomaly(t,pc(2,:));
+subplot(2,5,8); anomaly(t,pc(3,:));
+subplot(2,5,9); anomaly(t,pc(4,:));
+subplot(2,5,10); anomaly(t,pc(5,:));
 
 %% Experiment with DMD
 % use two models as an illustration (localized basal perturbation)
 % parameter
-n_m = 5;
+n_m = 20;
 
 md_expt = load('long_models_yang/model_W11000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading_DiffuGaussianPerturb_8.mat').md;
 md_ctrl = load('long_models_yang/model_W11000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
 results_tbl_expt = struct2table(md_expt.results.TransientSolution);
 results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
-deltaH = [results_tbl_expt.Thickness{:}] - [results_tbl_ctrl.Thickness{:}];
+expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
+deltaH = expt_H_interp - [results_tbl_ctrl.Thickness{:}];
+deltaMask = [results_tbl_expt.MaskOceanLevelset{:}] - [results_tbl_ctrl.MaskOceanLevelset{:}];
 deltaH_cell = num2cell(deltaH,1);
-
-% h_1st = results_tbl.Thickness(2:end);
-% h_2nd = results_tbl.Thickness(1:end-1);
-% dhdt = [h_2nd{:}] - [h_1st{:}];
-% % wrap into cell array
-% dhdt_cell = num2cell(dhdt,1);
-% clear dhdt
-% we need to transform to regular grid
 [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, 50);
-% suppress large dhdt due to frontal ablation
 [mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, 50);
-md_grid(mask_grid>=0) = 0;
+% permute
+md_grid = permute(md_grid,[2,3,1]);
+
+% apply the last mask to data at all timesteps
+mask = mask_grid(end,:,:);
+for i = 1:size(md_grid,3)
+    md_temp = md_grid(:,:,i);
+    md_temp(mask >=0) = 0;
+    md_grid(:,:,i) = md_temp;
+end
 
 % DMD
-[evals, evecs, mode_amps, mode_freq, growth_rates, mode_E] = dmd_rom(md_grid2, n_m, 0.1); % first 5 mode
+% make the first dimension the time dimension
+md_grid = permute(md_grid, [3,1,2]);
+% truncate in time
+md_grid = md_grid(50:210,:,:);
+[evals, evecs, mode_amps, mode_freq, growth_rates, mode_E] = dmd_rom(md_grid, n_m, 0.1); % first 5 mode
 dominant_mode_No=find(mode_amps==max(mode_amps));
 %==========Mode Amplitudes===========
 figure('color', 'w');
@@ -338,15 +507,16 @@ set(gca, 'YScale', 'log')
 title('Mode amplitude versus Frequency');
 xlabel('f [Hz]');ylabel('Amplitude');
 %==========Evolve one mode in time============
-m=2; % plot the first mode
-theta=linspace(0,6*pi,100);
+m=19; % plot the first m mode
+theta=linspace(0,16,160);
 figure('color', 'w','Position',[100,100,1000,300]); 
 for i=1:length(theta)
-    H=squeeze(real(evecs(m,:,:)*exp(1i*theta(i))));
+    H=squeeze(real(mode_amps(m)*evecs(m,:,:)*exp(1i*evals(m)*theta(i))));
     imagesc(x,y,H)
-    clim([-0.01, 0.01])
+    title(['time is ',num2str(theta(i))])
+    clim([-3, 3])
     colorbar
-    pause(0.05);
+    pause(0.02);
 end
 % all first n modes
 figure;
@@ -358,3 +528,14 @@ for j = 1:5
     drawnow;
 end
 % Now, how to reconstruct the sinusoidal wave?
+theta=linspace(0,16,160);
+m_sel = [13,14,15,16];
+figure('color', 'w','Position',[100,100,1000,300]); 
+for i=1:length(theta)
+    H=squeeze(sum(real(mode_amps(m_sel).*evecs(m_sel,:,:).*exp(1i*evals(m_sel)*theta(i))),1));
+    imagesc(x,y,H)
+    title(['time is ',num2str(theta(i))])
+    clim([-10, 10])
+    colorbar
+    pause(0.02);
+end
