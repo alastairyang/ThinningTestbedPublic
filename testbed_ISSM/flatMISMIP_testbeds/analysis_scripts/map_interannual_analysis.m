@@ -7,7 +7,7 @@
 %% Experiment with polynomial de-trending
 gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
 pulse_type = 'Pulse'; % types: "Diffu","Pulse"
-geom_type = 'shallow'; % types: "deep", "shallow"
+geom_type = 'deep'; % types: "deep", "shallow"
 expt_type = 'mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
 
 % model parameters and plot parameters
@@ -75,7 +75,7 @@ gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
 % Singular spectral analysis approach
-for j = 1
+for j = [1,3,7,9]
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -139,55 +139,59 @@ for j = 1
     color_length = length(unique_dist);
     red = [255, 51, 153]/255;
     sth = [153, 153, 255]/255;
-%     colors_p = [linspace(red(1),sth(1),color_length)',...
-%                 linspace(red(2),sth(2),color_length)',...
-%                 linspace(red(3),sth(3),color_length)'];
     colors_p = cool(color_length);
     colororder(colors_p)
     % color: from nearest to the furthest
     color_axis = transpose(linspace(min(abs_dist), max(abs_dist),length(dist))); % 10^0 to 10^4
 
-    figure('Position',[100,100,1100,500]);
-    % iterate over each line / control point
-    for i = 1:length(dist)
-        % Long term
-        subplot(2,2,[1,2])
-        line_color = interp1(color_axis, colors_p, abs_dist(i));
-        if dist(i) >= 0 % downstream
-            line_style = '-';
-        else % upstream
-            line_style = '--';
-        end
-        plot(t_axis, md_grid_mid(i,:),"Color",line_color,'LineStyle',line_style);
-        hold on
+%     figure('Position',[100,100,1100,500]);
+%     % iterate over each line / control point
+%     for i = 1:length(dist)
+%         % Long term
+%         subplot(2,2,[1,2])
+%         line_color = interp1(color_axis, colors_p, abs_dist(i));
+%         if dist(i) >= 0 % downstream
+%             line_style = '-';
+%         else % upstream
+%             line_style = '--';
+%         end
+%         plot(t_axis, md_grid_mid(i,:),"Color",line_color,'LineStyle',line_style);
+%         hold on
+% 
+%         subplot(2,2,3)
+%         line_color = interp1(color_axis, colors_p, abs_dist(i));
+%         if dist(i) >= 0 % downstream
+%             line_style = '-';
+%         else % upstream
+%             line_style = '--';
+%         end
+%         plot(t_axis, LTs(i,:),"Color",line_color,'LineStyle',line_style);
+%         hold on
+% 
+%         % short term
+%         subplot(2,2,4)
+%         plot(t_axis, STs(i,:),"Color",line_color,'LineStyle',line_style);
+%         hold on
+%     end
+%     subplot(2,2,3);title('Long term'); xlabel('time');ylabel('m')
+%     subplot(2,2,4);title('Short term'); xlabel('time');ylabel('m')
+%     plot_title = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type,'.png'];
+%     exportgraphics(gcf,['plots/pulse_mu_plots/',plot_title],'Resolution',300)
 
-        subplot(2,2,3)
-        line_color = interp1(color_axis, colors_p, abs_dist(i));
-        if dist(i) >= 0 % downstream
-            line_style = '-';
-        else % upstream
-            line_style = '--';
-        end
-        plot(t_axis, LTs(i,:),"Color",line_color,'LineStyle',line_style);
-        hold on
-
-        % short term
-        subplot(2,2,4)
-        plot(t_axis, STs(i,:),"Color",line_color,'LineStyle',line_style);
-        hold on
+%     % plotting animation
+%     [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
+%     figure('Position',[100,100,1100,450]);
+%     for i = 1:260
+%         subplot(2,1,1);imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
+%         subplot(2,1,2);imagesc(x,y,squeeze(H_grid(i,:,:)));title(num2str(i/10));hold on; clim([0,800]);colorbar;
+%         pause(0.05);
+%     end
+    is = [198,208];
+    if j == 3
+        is = [118, 198];
     end
-    subplot(2,2,3);title('Long term'); xlabel('time');ylabel('m')
-    subplot(2,2,4);title('Short term'); xlabel('time');ylabel('m')
-    plot_title = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type,'.png'];
-    exportgraphics(gcf,['plots/pulse_mu_plots/',plot_title],'Resolution',300)
-
-    % plotting animation
-    [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
-    figure('Position',[100,100,1100,450]);
-    for i = 1:260
-        subplot(2,1,1);imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colorbar;
-        subplot(2,1,2);imagesc(x,y,squeeze(H_grid(i,:,:)));title(num2str(i/10));hold on; clim([0,800]); colorbar;
-        pause(0.05);
+    if j == 9
+        is = [118, 192];
     end
 
     % plot the grounding line position over time
@@ -203,11 +207,22 @@ for j = 1
     gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
     gls_diff = gls_expt_interp - gls_ctrl;
 
-    figure;
-    plot(t_ctrl-t_ctrl(1), gls_diff)
-    
+    datas = md_grid(:,:,is);
+    snapshots_fig = plot_result_snapshots(x, y, datas, W);
+    nexttile(3,[2,1])
+    t_shift = t_ctrl-t_ctrl(1);
+    plot(gls_diff, t_shift,'-k','LineWidth',1); 
+    % add the times of the two snapshots
+    hold on;
+    scatter(gls_diff(is), t_shift(is),40,'filled','red');
+    set(gca, 'YDir','reverse'); ylim([0,26]);
+    xlabel('Relative grounding line position (m)','Interpreter','latex','FontSize',13)
+    ylabel('Time (yr)','Interpreter','latex','FontSize',13)
 
-    % find the snapshot of most thinning
+    % save the graphics
+    snps_plot_title = [md_ctrl.miscellaneous.name(9:end) '_' pulse_type '_' geom_type '_' expt_type '.png'];
+    exportgraphics(gcf,['plots/pulse_mu_plots/snapshots/' snps_plot_title], 'Resolution', 300)
+    
     
 %     % long term mean timeseries
 %     LTs_time_mean = squeeze(mean(LTs, [1,2]));
@@ -232,7 +247,7 @@ for j = 1
 %     LTs_cl(j,:) = last_LTs(size(last_LTs,1)/2,:);
 
     % report
-    disp(['model ',plot_title(1:end-4), ' is processed!'])
+    disp(['model ',snps_plot_title(1:end-4), ' is processed!'])
 end
 
 %% Detrending iteration
