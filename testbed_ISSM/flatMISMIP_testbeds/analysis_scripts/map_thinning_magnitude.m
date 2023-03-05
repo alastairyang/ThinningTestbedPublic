@@ -8,7 +8,7 @@
 % grounding line models
 
 glacier_length = 56500; % initial glacier length (x = 0 to calving front)
-length_to_keep = 20000; % 20 km behind the calving front to keep for the plots
+length_to_keep = 30000; % 20 km behind the calving front to keep for the plots
 
 % model parameters and plot parameters
 % read in the model parameter table

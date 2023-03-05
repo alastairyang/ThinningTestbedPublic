@@ -46,7 +46,7 @@ tic
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
 % model iteration
-for jj = 16
+for jj = 13
 
     var_table = mdvar_combs(jj,:);
 
@@ -67,7 +67,7 @@ for jj = 16
     end
 
     % step iteration
-    for steps = 11
+    for steps = [11,12]
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1249,8 +1249,6 @@ for jj = 16
             md.results.TransientSolution = new_results;
 
             savemodel(org, md);
-            % save timestep record
-            save("timestep_record.mat", "timestep_record")
 
             % run time in seconds, print in minutes
             runTime = toc;

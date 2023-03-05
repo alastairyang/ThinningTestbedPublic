@@ -27,7 +27,6 @@ xlabel_i = [7,8,9];
 Ws_symb = [10,20,30];
 FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
 
-
 % split the folder_dir into two groups, separated by grounding line depth
 folder_dir_groups = cell(1,2);
 for i = 1:length(GLs)
@@ -74,7 +73,6 @@ LTs_cl = zeros(n_simu, 1200);
 gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
-% Singular spectral analysis approach
 for j = [1,3,7,9]
     % read the model
     group = folder_dir_groups{geom_i};
@@ -223,34 +221,12 @@ for j = [1,3,7,9]
     snps_plot_title = [md_ctrl.miscellaneous.name(9:end) '_' pulse_type '_' geom_type '_' expt_type '.png'];
     exportgraphics(gcf,['plots/pulse_mu_plots/snapshots/' snps_plot_title], 'Resolution', 300)
     
-    
-%     % long term mean timeseries
-%     LTs_time_mean = squeeze(mean(LTs, [1,2]));
-%     LTs_time_min  = squeeze(min(LTs, [],[1,2]));
-%     
-%     md_name = md_ctrl.miscellaneous.name(9:end);
-%     % trend: find total delta H
-%     % cyclic: find range (max - min)
-%     last_LTs = -1*squeeze(LTs(:,:,end));
-%     STs_range = STs_max - STs_min;
-% 
-%     % get the corresponding symbols for this scatter plot
-%     W_symbs(j,1) = Ws_symb(W==Ws);
-%     FC_symbs(j,:) = FCs_symb(FC==FCs,:);
-%     % save the plot
-% %     save_dir = ['plots/diffu_mu_plots/',md_name,'.png'];
-% %     exportgraphics(gcf, save_dir, 'Resolution',300)
-%     disp(['model ',md_name,' is completed!'])
-% 
-%     % save the center flow line
-%     STs_cl(j,:) = STs_range(size(STs_range,1)/2,:);
-%     LTs_cl(j,:) = last_LTs(size(last_LTs,1)/2,:);
 
     % report
     disp(['model ',snps_plot_title(1:end-4), ' is processed!'])
 end
 
-%% Detrending iteration
+%% Polynomial Detrending iteration
 for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};

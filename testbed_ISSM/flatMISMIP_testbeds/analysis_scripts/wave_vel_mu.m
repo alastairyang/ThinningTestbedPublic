@@ -72,6 +72,10 @@ for i = 1:length(GLs)
 end
 
 %% For control group
+% pre-allocate
+ctrl_slopes = zeros(length(GLs),size(ctrl_folder_dir,1));
+ctrl_slopes_ci = zeros(length(GLs),size(ctrl_folder_dir,1),2);
+
 tiledlayout(2,1, 'TileSpacing','none','Padding','none');
 titles = ["Shallow","Deep"];
 %figure('Position',[100,100,500,500]);
@@ -90,21 +94,26 @@ for j = 1:length(GLs) % iterate over grounding line depths
         [W, GL, FC] = parse_modelname(modelname);
 
         % need to coarsen the data, or the derivative produces wiggles
-        smooth_window = 20;
+        smooth_window = 30;
         % to smooth data, we have to iterate over each flow line
         % reshape the matrix into a vector and smooth will create
         % jumps/shocks
-        h_smooth = zeros(size(md.h));
+        dhdt = zeros(size(md.h,1)-1, size(md.h,2));
         for line_i = 1:size(md.h,2)
-            h_smooth(:,line_i) = smooth(md.h(:,line_i), smooth_window);
+            md.h(:,line_i) = smooth(md.h(:,line_i), smooth_window);
         end
-        dh = diff(h_smooth,1,1);
-        dt = md.t(2) - md.t(1);
-        dhdt = dh/dt;
 
-        % find the lag year to calving front reversal
+        dhdt_ori = diff(md.h,1,1)/(md.t(2) - md.t(1));
+        for line_i = 1:size(dhdt,2)
+            dhdt(:,line_i) = smooth(dhdt_ori(:,line_i), smooth_window);
+        end
+        
+
+        % first interp and then find the lag year to calving front reversal
+        t_finer = md.t(1):0.01:md.t(end);
+        dhdt = interp1(md.t(1:end-1),dhdt,t_finer,'spline');
         [min_dhdt, min_dhdt_i] = min(dhdt,[], 1);
-        min_dhdt_year = md.t(min_dhdt_i);
+        min_dhdt_year = t_finer(min_dhdt_i);
         travel_time = min_dhdt_year;
         % create along flowline sampling distance
         % here we define the distance as to the first kept sampled point
@@ -124,35 +133,45 @@ for j = 1:length(GLs) % iterate over grounding line depths
 
         % more compact illustration: 1 scatter plot
         % get the linear fit to lag time - distance 
-        P = polyfit(distances, travel_time, 1);
-        slope = P(1); 
-        intercpt = P(2);
-        distances_forplot = distances(1):0.1:distances(end);
-        travel_time_md = polyval(P, distances_forplot);
+        %[pp, ~] = regress(travel_time(:), [distances(:) ones(numel(distances),1)]);
+        %distances_forplot = distances(1):0.1:distances(end);
+        %travel_time_md = polyval(pp, distances_forplot);
+        [pp, ~] = regress(distances(:), [travel_time(:) ones(numel(distances),1)]);
+        travel_time_forplot = travel_time(1):0.01:travel_time(end);
+        distances_forplot = polyval(pp, travel_time_forplot);
         % get the corresponding symbols for this scatter plot
         W_symb = Ws_symb(W==Ws);
         GL_symb = GLs_symb(GL==GLs);
         FC_symb = FCs_symb(FC==FCs,:);
         % plot both the scatter and the linear fit
-        scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
+        %scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
+        scatter(travel_time, distances, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
         hold on
-        plot(distances_forplot, travel_time_md, '-.k'); 
-        xlim([0,20])
-        ylim([0,8])
+        %plot(distances_forplot, travel_time_md, '-.k'); 
+        plot(travel_time_forplot, distances_forplot, '-.k')
+        xlim([0,6])
+        ylim([0,25])
         alpha(0.7)
+        % linear regression again, but x y reversed
+        [pp, pp_ci] = regress(distances(:), [travel_time(:) ones(numel(distances),1)]);
+        slope = pp(1); 
+        ctrl_slopes(j,i) = slope;
+        ctrl_slopes_ci(j,i,:) = pp_ci(1,:);
     end
-    ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
-    xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
+    xlabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
+    ylabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
     text(0.7, 7.5, titles(j),'Interpreter','latex','FontSize',15)
 end
 exportgraphics(gcf,'plots/ctrl_travel_time.pdf','ContentType','vector')
 %% For experiment
+expt_slopes = zeros(length(GLs),size(expt_folder_dir,1));
+expt_slopes_ci = zeros(length(GLs),size(expt_folder_dir,1),2);
+
 tiledlayout(2,1, 'TileSpacing','none','Padding','none');
 titles = ["Shallow","Deep"];
 
 hCopys = []; % storing the scatter elements
 kin_wave_vels = zeros(length(GLs)*size(expt_folder_dir,1), 4); % 4 columns: width, depth, coef, slope
-%figure('Position',[100,100,500,500]);
 for j = 1:length(GLs) % iterate over grounding line depths
     expt_folder_dir = expt_folder_dir_groups{j};
     md_count = 0;
@@ -168,21 +187,25 @@ for j = 1:length(GLs) % iterate over grounding line depths
         [W, GL, FC] = parse_modelname(modelname);
 
         % need to coarsen the data, or the derivative produces wiggles
-        smooth_window = 20;
+        smooth_window = 30;
         % to smooth data, we have to iterate over each flow line
         % reshape the matrix into a vector and smooth will create
         % jumps/shocks
-        h_smooth = zeros(size(md.h));
+        dhdt = zeros(size(md.h,1)-1, size(md.h,2));
         for line_i = 1:size(md.h,2)
-            h_smooth(:,line_i) = smooth(md.h(:,line_i), smooth_window);
+            md.h(:,line_i) = smooth(md.h(:,line_i), smooth_window);
         end
-        dh = diff(h_smooth,1,1);
-        dt = md.t(2) - md.t(1);
-        dhdt = dh/dt;
 
-        % find the lag year to calving front reversal
+        dhdt_ori = diff(md.h,1,1)/(md.t(2) - md.t(1));
+        for line_i = 1:size(dhdt,2)
+            dhdt(:,line_i) = smooth(dhdt_ori(:,line_i), smooth_window);
+        end
+
+        % first interp and then find the lag year to calving front reversal
+        t_finer = md.t(1):0.01:md.t(end);
+        dhdt = interp1(md.t(1:end-1),dhdt,t_finer,'spline');
         [min_dhdt, min_dhdt_i] = min(dhdt,[], 1);
-        min_dhdt_year = md.t(min_dhdt_i);
+        min_dhdt_year = t_finer(min_dhdt_i);
         travel_time = min_dhdt_year;
         % create along flowline sampling distance
         % here we define the distance as to the first kept sampled point
@@ -202,40 +225,43 @@ for j = 1:length(GLs) % iterate over grounding line depths
 
         % more compact illustration: 1 scatter plot
         % get the linear fit to lag time - distance 
-        P = polyfit(distances, travel_time, 1);
-        slope = P(1); 
-        intercpt = P(2);
-        distances_forplot = distances(1):0.1:distances(end);
-        travel_time_md = polyval(P, distances_forplot);
+        [pp, ~] = regress(distances(:), [travel_time(:) ones(numel(distances),1)]);
+        travel_time_forplot = travel_time(1):0.01:travel_time(end);
+        distances_forplot = polyval(pp, travel_time_forplot);
         % get the corresponding symbols for this scatter plot
         W_symb = Ws_symb(W==Ws);
         GL_symb = GLs_symb(GL==GLs);
         FC_symb = FCs_symb(FC==FCs,:);
         % plot both the scatter and the linear fit
-        ax = gca;
-        %h = scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
-        h = plot(distances, travel_time, 'Color',FC_symb, 'Marker','.','MarkerSize',W_symb*0.4,'LineStyle','none');
+        %scatter(distances, travel_time, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
+        scatter(travel_time, distances, W_symb, GL_symb, 'MarkerFaceColor',FC_symb,'MarkerEdgeColor','k');
         hold on
-        plot(distances_forplot, travel_time_md, '-.k'); 
-        xlim([0,20])
-        ylim([0,8])
+        %plot(distances_forplot, travel_time_md, '-.k'); 
+        plot(travel_time_forplot, distances_forplot, '-.k')
+        xlim([0,6])
+        ylim([0,25])
         alpha(0.7)
-        % add the legend with customized marker size 
-        hCopy = copyobj(h, ax); 
-        set(hCopy,'XData', NaN', 'YData', NaN);
-        hCopy.MarkerSize = W_symb*0.15;
-        hCopys = [hCopys, hCopy];
+%         % add the legend with customized marker size 
+%         hCopy = copyobj(h, ax); 
+%         set(hCopy,'XData', NaN', 'YData', NaN);
+%         hCopy.MarkerSize = W_symb*0.15;
+%         hCopys = [hCopys, hCopy];
+
+        % save to workspace
+        % linear regression again, but x y reversed
+        [pp, pp_ci] = regress(distances(:), [travel_time(:) ones(numel(distances),1)]);
+        slope = pp(1); 
+        expt_slopes(j,i) = slope;
+        expt_slopes_ci(j,i,:) = pp_ci(1,:);
 
         % save the slopes (wave velocity) along with model parameters
         % to a table
         % first convert subscript indexing to linear indexing
-        
         id = sub2ind([length(GLs), size(expt_folder_dir,1)], j, i);
         kin_wave_vels(id,1) = W;
         kin_wave_vels(id,2) = GL;
         kin_wave_vels(id,3) = FC;
-        true_slope = polyfit(travel_time, distances, 1);
-        kin_wave_vels(id,4) = true_slope(1);
+        kin_wave_vels(id,4) = slope;
 
     end
     ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
@@ -248,6 +274,46 @@ exportgraphics(gcf,'plots/mu_travel_time.pdf','ContentType','vector')
 % make the kinematic wave estimate a table and export to a spreedsheet
 kin_wave_vels = array2table(kin_wave_vels, 'VariableNames',["Width","Depth","Coefficient","KW Velocity (km/a)"]);
 writetable(kin_wave_vels,'result_tables/kinematic_wave_estimate_control.csv')
+
+%% Plot all the slopes
+ctrl_x = 3;
+expt_x = 5;
+plot_xlim = [ctrl_x-1.5, expt_x+1.5];
+xlabels = ["Shallow","Deep"];
+figure('Position',[100,100,1000,700])
+tiledlayout(1,2,"TileSpacing","none")
+for j = 1:length(GLs)
+    nexttile
+    for i = 1:size(expt_folder_dir,1)
+        % load the data to get model parameter information
+        md = load(string(expt_folder_dir.folder(i))+"/"+ string(expt_folder_dir.name(i))).ht_data;
+        modelname = expt_folder_dir.name(i);
+        modelname = modelname{1}(length(expt_folder_prefix)+1:end-4);
+        % get the model parameter
+        [W, GL, FC] = parse_modelname(modelname);
+        W_symb = Ws_symb(W==Ws);
+        GL_symb = GLs_symb(GL==GLs);
+        FC_symb = FCs_symb(FC==FCs,:);
+        % add the data points
+        % ctrl
+        errorbar(ctrl_x, ctrl_slopes(j,i), squeeze(ctrl_slopes_ci(j,i,:))-ctrl_slopes(j,i), 'vertical', 'Color',FC_symb, 'Marker','.','MarkerSize',W_symb*0.4,'LineStyle','none');
+        hold on;
+        % expt
+        errorbar(expt_x, expt_slopes(j,i), squeeze(expt_slopes_ci(j,i,:))-expt_slopes(j,i), 'vertical', 'Color',FC_symb, 'Marker','.','MarkerSize',W_symb*0.4,'LineStyle','none');
+        hold on;
+        % draw lines that connect
+        plot([ctrl_x,expt_x],[ctrl_slopes(j,i),expt_slopes(j,i)],'Color',FC_symb,'LineStyle',':','LineWidth',W_symb*0.02);hold on
+    end
+    xlim(plot_xlim)
+    ylim([0,20])
+    xticks([ctrl_x, expt_x]);
+    xticklabels({'without N','with N'});
+    if j == 1; ylabel('Velocity (km/yr)','Interpreter','latex','FontSize',13); end
+    if j == 2; set(gca, 'ytick',[]);end
+    xlabel(xlabels(j),'Interpreter','latex','FontSize',13)
+end
+exportgraphics(gcf,'plots/wave_vels.png','Resolution',300)
+
 %% save to folder
 saveas(gcf, 'plots/calve_timelag_scatter.pdf')
 

@@ -1,10 +1,9 @@
 %% force balance
-% here we find the change in fractional basal resistive stress at the end
-% of the perturbation. 
-% Unlike th old code, we right now ignore the longitudinal and the lateral
-% resistive stress; also we look at all the models rather than 2
+% here we find the change force balance structure
+
 geom_type = "deep"; % options: "deep" or "shallow"
 ds = 50; % grid size for the regular grid
+sampled_ti = 1:10:240; % sampled time index
 front_x = 56650; % terminus distance to x = 0
 
 % model parameters and plot parameters
@@ -47,11 +46,11 @@ switch geom_type
 end
 
 % save the force balance field data
-driving_S_all = cell(2, n_simu);
-longi_grad_all = cell(2, n_simu);
-later_grad_all = cell(2, n_simu);
-basal_R_all = cell(2, n_simu);
-for j = 9
+driving_S_all = cell(260, n_simu);
+longi_grad_all = cell(260, n_simu);
+later_grad_all = cell(260, n_simu);
+basal_R_all = cell(260, n_simu);
+for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
     md = load([group.folder{j},'/', group.name{j}, '/', md_name]).md;
@@ -62,11 +61,10 @@ for j = 9
     
     % get H from vertices to elements
     % timesteps we look at: first and last
-    timesteps = [1, size(md.results.TransientSolution,2)];
-    for ti = 1:length(timesteps)
-        t = timesteps(ti);
+    %timesteps = [1, size(md.results.TransientSolution,2)];
+    for ti = sampled_ti
         smooth_L = 1000;
-        [driving_S, basal_R, longi_grad, later_grad, x, y] = calc_force_balance(md,t,smooth_L);
+        [driving_S, basal_R, longi_grad, later_grad, x, y] = calc_force_balance(md,ti,smooth_L);
         % save
         % first row: first time step; second row: last time step
         driving_S_all{ti,j} = driving_S; 
@@ -77,9 +75,9 @@ for j = 9
         % plotting code: plot the lateral and longitudinal resistive stress
         % on one figure
 %         figure('Position',[100,100,1400,300]); 
-%         strs_bd = 1e5;
-%         subplot(1,2,1);imagesc(xq,yq,longi_grad);clim([-strs_bd, strs_bd]);
-%         subplot(1,2,2);imagesc(xq,yq,later_grad);clim([-strs_bd, strs_bd])
+%         strs_bnd = 1e5;
+%         subplot(1,2,1);imagesc(xq,yq,longi_grad);clim([-strs_bdn, strs_bnd]);
+%         subplot(1,2,2);imagesc(xq,yq,later_grad);clim([-strs_bnd, strs_bnd])
 %         colorbar
 
 %         % plotting code: plot the change in the lateral resistive stress 
@@ -96,27 +94,57 @@ for j = 9
         % timestep
         %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,driving_S_all{1,j});clim([0,3e5]);subplot(2,1,2);imagesc(x,y,basal_R_all{1,j}+later_grad_all{1,j}+longi_grad_all{1,j}); clim([0,3e5])
         
-
     end
+    disp(['model ',num2str(j), ' is completed!'])
 end
 
-%% plot t = 1 and t = end
-% t = 1
-figure('Position',[100,100,800,300]);
+%% plot center line basal R evolution
+figure('Position',[100,100,1200,600]);
 tiledlayout(3,3,'TileSpacing','none')
-for i = 1:n_simu
+for j = 1:n_simu
     nexttile
-    imagesc(fb_ratio{1,i});
-    clim([0,1])
-end
+    colororder(cool(length(sampled_ti)))
+    for ti = sampled_ti % skip every 10 for neatness
+%     imagesc(fb_ratio{1,i});
+%     clim([0,1])
+        % import grounding line position
+        % extract data along center flow line
+        yi_mid = floor(size(basal_R_all{ti,j},1)/2);
+        basal_R_mid   = basal_R_all{ti,j}(yi_mid,:);
+        driving_S_mid = driving_S_all{ti,j}(yi_mid,:);
+        basal_R_frac = basal_R_mid./driving_S_mid;
+        plot(x/1000, basal_R_frac)
 
-figure('Position',[600,100,800,300]);
-tiledlayout(3,3,'TileSpacing','none')
-for i = 1:n_simu
-    nexttile
-    imagesc(fb_ratio{2,i});
-    clim([0,1])
+         %plot longitudinal component
+%         yi_mid = floor(size(longi_grad_all{ti,j},1)/2);
+%         longi_grad_mid   = longi_grad_all{ti,j}(yi_mid,:);
+%         driving_S_mid = driving_S_all{ti,j}(yi_mid,:);
+%         longi_grad_frac = longi_grad_mid./driving_S_mid;
+%         plot(x/1000, longi_grad_frac)
+
+        ylim([0,1])
+        hold on;
+    end
+
+    % modify the tiled plot appearance
+    if j == 4
+        ylabel('$\tau_b/\tau_d$','Interpreter','latex','FontSize',20)    
+    end
+    if j == 8
+        xlabel('Along flow distance (km)','Interpreter','latex','FontSize',20)
+    end
+    if ismember(j, [2,3,5,6,8,9])
+        set(gca,'ytick',[]);
+    else
+        set(gca,'ytick',[0.5,1])
+    end
+    if ismember(j, [1,2,3,4,5,6])
+        set(gca,'xtick',[]); 
+    end
+
 end
+exportgraphics(gcf,'plots/taub_taud_frac.png','Resolution',300)
+
 %% APPENDIX: Old force balance script
 md1_name = "model_W5000_GL0_FC120000";
 md2_name = "model_W5000_GL0_FC30000";
