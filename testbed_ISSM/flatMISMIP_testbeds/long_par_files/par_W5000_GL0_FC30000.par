@@ -52,7 +52,7 @@ bx = B0 + bed_slope.*md.mesh.x; % constant slope
 % bx   = B0 - 728.8.*(md.mesh.x/xbar).^2 + 343.91.*(md.mesh.x/xbar).^4 - 50.57.*(md.mesh.x/xbar).^6;
 
 % across flow variation in basal topography
-fc = 400; % 800; % characteristic width of the side walls of the channel
+fc = 400; % characteristic width of the side walls of the channel
 dc = 1000; % depth of the trough compared with the side walls
 xhat = 15000; 
 funnel_factor = ones(size(md.mesh.x)); 

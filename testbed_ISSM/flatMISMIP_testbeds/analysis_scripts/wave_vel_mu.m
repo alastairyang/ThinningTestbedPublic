@@ -76,9 +76,9 @@ end
 ctrl_slopes = zeros(length(GLs),size(ctrl_folder_dir,1));
 ctrl_slopes_ci = zeros(length(GLs),size(ctrl_folder_dir,1),2);
 
+figure('Position',[100,100,600,700]);
 tiledlayout(2,1, 'TileSpacing','none','Padding','none');
 titles = ["Shallow","Deep"];
-%figure('Position',[100,100,500,500]);
 for j = 1:length(GLs) % iterate over grounding line depths
     ctrl_folder_dir = ctrl_folder_dir_groups{j};
     md_count = 0;
@@ -159,14 +159,15 @@ for j = 1:length(GLs) % iterate over grounding line depths
         ctrl_slopes_ci(j,i,:) = pp_ci(1,:);
     end
     xlabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
-    ylabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
-    text(0.7, 7.5, titles(j),'Interpreter','latex','FontSize',15)
+    ylabel('Distance to calving front (km)','Interpreter','latex','FontSize',16)
+    text(5.5, 18, titles(j),'Interpreter','latex','FontSize',15)
 end
 exportgraphics(gcf,'plots/ctrl_travel_time.pdf','ContentType','vector')
 %% For experiment
 expt_slopes = zeros(length(GLs),size(expt_folder_dir,1));
 expt_slopes_ci = zeros(length(GLs),size(expt_folder_dir,1),2);
 
+figure('Position',[100,100,600,700])
 tiledlayout(2,1, 'TileSpacing','none','Padding','none');
 titles = ["Shallow","Deep"];
 
@@ -264,9 +265,9 @@ for j = 1:length(GLs) % iterate over grounding line depths
         kin_wave_vels(id,4) = slope;
 
     end
-    ylabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
-    xlabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
-    text(0.7, 7.5, titles(j),'Interpreter','latex','FontSize',15)
+    xlabel(' Arrival time (yr)','Interpreter','latex','FontSize',16)
+    ylabel('Distance to calving front $x$ (km)','Interpreter','latex','FontSize',16)
+    text(5.5, 18, titles(j),'Interpreter','latex','FontSize',15)
 
 end
 exportgraphics(gcf,'plots/mu_travel_time.pdf','ContentType','vector')

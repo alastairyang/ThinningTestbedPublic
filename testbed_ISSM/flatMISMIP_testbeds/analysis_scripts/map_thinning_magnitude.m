@@ -137,7 +137,7 @@ for j = 1:n_simu
     deltaH_ctrl{j, deeperGL_i}.y = y;
 end
 
-%% Experiment (effective pressure feedback)
+%% Experiment (effective pressure)
 % Shallow grounding line
 for j = 1:n_simu
     % read the model
@@ -218,7 +218,7 @@ end
 %% Make tiled plots
 % shallower
 figure('Position',[200,200,500,500]);
-h = tiledlayout(3,3, 'TileSpacing', 'none', 'Padding', 'none');
+h = tiledlayout(3,3, 'TileSpacing', 'none');
 for j = 1:n_simu
     nexttile
     imagesc(deltaH_expt{j,shallowGL_i}.x, deltaH_expt{j,shallowGL_i}.y,...
@@ -239,10 +239,13 @@ for j = 1:n_simu
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
-exportgraphics(gcf,'plots/dH_from_feedback_shallowGL.pdf')
+cb.Title.String = 'Change in elevation (m)';
+cb.FontSize = 15;
+cb.FontName = 'Times';
+exportgraphics(gcf,'plots/dH_from_feedback_shallowGL.png','Resolution',300)
 
 %% deeper
-figure('Position',[800,200,500,500]);
+figure('Position',[800,200,800,800]);
 h = tiledlayout(3,3, 'TileSpacing', 'tight');
 for j = 1:n_simu
     nexttile
@@ -265,5 +268,7 @@ for j = 1:n_simu
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
-cb.Title.String = 'Elevation change (m)';
-exportgraphics(gcf,'plots/dH_from_feedback_deepGL.pdf')
+ylabel(cb,'Change in elevation (m)','Interpreter','latex','FontSize',15);
+% cb.FontSize = 15;
+% cb.FontName = 'Times';
+exportgraphics(gcf,'plots/dH_from_feedback_deepGL.png','Resolution',300)

@@ -1,6 +1,6 @@
 %% force balance
-% here we find the change force balance structure
-
+% We find the temporal change in force balance structure
+%% Main script
 geom_type = "deep"; % options: "deep" or "shallow"
 ds = 50; % grid size for the regular grid
 sampled_ti = 1:10:240; % sampled time index
@@ -98,13 +98,13 @@ for j = 1:n_simu
     disp(['model ',num2str(j), ' is completed!'])
 end
 
-%% plot center line basal R evolution
+%% plot evolution of fractional force balance
 figure('Position',[100,100,1200,600]);
 tiledlayout(3,3,'TileSpacing','none')
 for j = 1:n_simu
     nexttile
     colororder(cool(length(sampled_ti)))
-    for ti = sampled_ti % skip every 10 for neatness
+    for ti = sampled_ti 
 %     imagesc(fb_ratio{1,i});
 %     clim([0,1])
         % import grounding line position
@@ -114,13 +114,6 @@ for j = 1:n_simu
         driving_S_mid = driving_S_all{ti,j}(yi_mid,:);
         basal_R_frac = basal_R_mid./driving_S_mid;
         plot(x/1000, basal_R_frac)
-
-         %plot longitudinal component
-%         yi_mid = floor(size(longi_grad_all{ti,j},1)/2);
-%         longi_grad_mid   = longi_grad_all{ti,j}(yi_mid,:);
-%         driving_S_mid = driving_S_all{ti,j}(yi_mid,:);
-%         longi_grad_frac = longi_grad_mid./driving_S_mid;
-%         plot(x/1000, longi_grad_frac)
 
         ylim([0,1])
         hold on;
@@ -145,6 +138,41 @@ for j = 1:n_simu
 end
 exportgraphics(gcf,'plots/taub_taud_frac.png','Resolution',300)
 
+%% plot evolution of the absolute force component
+figure('Position',[100,100,1200,600]);
+tiledlayout(3,3,'TileSpacing','none')
+for j = 1:n_simu
+    nexttile
+    colororder(cool(length(sampled_ti)))
+    for ti = sampled_ti 
+        % plot longitudinal component
+        yi_mid = floor(size(basal_R_all{ti,j},1)/2);
+        basal_R_mid   = basal_R_all{ti,j}(yi_mid,:);
+        plot(x/1000, basal_R_mid)
+        hold on;
+        ylim([0,3.1e5])
+    end
+
+    % modify the tiled plot appearance
+    if j == 4
+        ylabel('$\tau_b (Pa)$','Interpreter','latex','FontSize',20)    
+    end
+    if j == 8
+        xlabel('Along flow distance (km)','Interpreter','latex','FontSize',20)
+    end
+    if ismember(j, [2,3,5,6,8,9])
+        set(gca,'ytick',[]);
+    else
+        set(gca,'ytick',[1e5,2e5, 3e5])
+    end
+    if ismember(j, [1,2,3,4,5,6])
+        set(gca,'xtick',[]); 
+    else
+        set(gca,'xtick',[10,20,30,40])
+    end
+
+end
+exportgraphics(gcf,'plots/taub.png','Resolution',300)
 %% APPENDIX: Old force balance script
 md1_name = "model_W5000_GL0_FC120000";
 md2_name = "model_W5000_GL0_FC30000";
