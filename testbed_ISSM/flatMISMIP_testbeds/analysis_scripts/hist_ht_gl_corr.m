@@ -4,6 +4,12 @@
 % map view study (map_ht_gl_corr.m)
 
 %% Main script
+% parameters
+md_type = 'expt'; % options: "expt", "ctrl"
+geom_type = 'deep'; % options: "deep", "shallow"
+ds = 500; % meshgrid spacing
+
+% input
 md_vars = readtable('md_var_combinations.csv');
 Ws = sort(unique(md_vars.('fjord_width')));
 GLs = sort(unique(md_vars.('delta_groundingline_depth')));
@@ -38,12 +44,7 @@ end
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
 
-%% Deeper grounding line
-% you can specify if you want to plot experiment (e.g., mass unloading) or
-% the control run
-md_type = 'ctrl'; % options: "expt", "ctrl"
-geom_type = 'deep'; % options: "deep", "shallow"
-
+%% Process the data
 % iterate over Deep GL models
 switch geom_type
     case 'deep'
@@ -53,10 +54,12 @@ switch geom_type
     otherwise
         warning('unknown depth specification!')
 end
-%figure('Position',[100,100,1000,800]);
+
+% pre-allocate
 n_simu = size(folder_dir_groups{geom_i}, 1);
 gl_hist = cell(1,n_simu);
 front_hist = cell(1,n_simu);
+dist_to_front = cell(1,n_simu);
 
 % start extracting data
 for j = 1:n_simu
@@ -67,7 +70,7 @@ for j = 1:n_simu
             load([group.folder{j},'/', group.name{j}, '/', ctrl_name])
             modelname = md.miscellaneous.name;
             load(['analyzed_data/calve_only/ht_calve_model_',modelname(9:end),'.mat'])
-        case 'expt' % here we use mass unloading (effective pressure feedback by default
+        case 'expt' % here we use effective pressure experiment by default
             load([group.folder{j},'/', group.name{j}, '/', expt_name])
             modelname = md.miscellaneous.name;
             load(['analyzed_data/mu_calve/ht_mu_calve_model_',modelname(9:end),'.mat'])
@@ -92,31 +95,39 @@ for j = 1:n_simu
         coefs = corrcoef(ht_data.front', h_mat(:,k));
         front_corr(k) = coefs(1,2);
     end
-    % crop the data: keep the grounded ice
-    [gl_corr_grid, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, gl_corr, 50);
-    [front_corr_grid, x, y] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, front_corr, 50);
-    mask = md.results.TransientSolution(end).MaskOceanLevelset;
-    gl_dist = locate_groundingline(md, mask);
+    % crop the data: keep the corr.coef. at grounded ice; sample the
+    % middle fast-flowing section
+    [gl_corr_grid, ~, ~] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, gl_corr, ds);
+    [front_corr_grid, x, y] = mesh_to_grid(md.mesh.elements, md.mesh.x, md.mesh.y, front_corr, ds);
+    % get the grounding line position at the last timestep
+    ocean_mask = md.results.TransientSolution(end).MaskOceanLevelset;
+    gl_dist = locate_groundingline(md, ocean_mask); 
     % crop
-    x_crop = x(x < gl_dist);
-    gl_corr_grid = gl_corr_grid(:, x < gl_dist);
-    front_corr_grid = front_corr_grid(:, x < gl_dist);
+    wid_factor = 0.3;
+    x_crop = x < gl_dist;
+    y_crop = y < max(y)/2+W*wid_factor & y > max(y)/2-W*wid_factor;
+    gl_corr_grid = gl_corr_grid(y_crop, x_crop);
+    front_corr_grid = front_corr_grid(y_crop, x_crop);
 
+    % get distance to ice front for each grid point
+    ice_mask = md.results.TransientSolution(end).MaskIceLevelset;
+    front_xy = isoline(md, ice_mask,'value',0);
+    front_y_crop = front_xy.y < max(front_xy.y)/2+W*wid_factor &...
+                         front_xy.y > max(front_xy.y)/2-W*wid_factor;
+    front_y = front_xy.y(front_y_crop);
+    front_x = front_xy.x(front_y_crop);
+    front_x_interp = interp1(front_y, front_x, transpose(y(y_crop)));
+    front_x_interp = fillmissing(front_x_interp,"nearest");
+    front_xy_interp = [front_x_interp, transpose(y(y_crop))];
+    % distance
+    [X_crop, Y_crop] = meshgrid(x(x_crop),y(y_crop));
+    dist_to_front{j} = abs(front_x_interp - X_crop);
+    
+    
     % save to cells
     gl_hist{j} = gl_corr_grid;
     front_hist{j} = front_corr_grid;
-    %title(modelname(9:end))
-    % add a grounding line + terminus plot as a inset box
-    %axes('Position',[.2 .7 .2 .2])
-%     p = get(gca, 'Position');
-%     pp = axes('Parent', gcf, 'Position', [p(1)+0.01 p(2)+0.12 p(3)-0.15 p(4)-0.15]);
-%     yyaxis left
-%     plot(ht_data.t, ht_data.front(1:end-1)); hold on;
-%     set(gca,'xtick',[],'ytick',[])
-%     yyaxis right
-%     plot(ht_data.t, ht_data.gl(1:end-1));
-%     set(gca,'xtick',[],'ytick',[])
-    %legend(["GL","Front"])
+
 
     disp([modelname,' is processed.'])
 
@@ -124,18 +135,29 @@ end
 
 %% Making the plot
 figure('Position',[100,100,800,800])
-tiledlayout(3,3,'TileSpacing','tight')
+tiledlayout(3,3,'TileSpacing','none')
 for j = 1:n_simu
     nexttile
-    q = histogram(front_hist{j},'normalization','probability'); hold on;
-    h = histogram(gl_hist{j},'normalization','probability'); hold on
-    h.BinEdges = 0.5:0.02:1;
-    q.BinEdges = 0.5:0.02:1;
-    if j == 1 % add legend
-        legend(["terminus","grounding line"],'Location','northwest')
+    scatter(dist_to_front{j}, front_hist{j},...
+        'MarkerFaceColor','r','MarkerEdgeColor','r','MarkerFaceAlpha',.2,'MarkerEdgeAlpha',.2); hold on;
+    scatter(dist_to_front{j}, gl_hist{j},...
+        'MarkerFaceColor','b','MarkerEdgeColor','b','MarkerFaceAlpha',.2,'MarkerEdgeAlpha',.2); hold on
+%     if j == 1 % add legend
+%         legend
+%     end
+    ylim([0.5,1])
+    if ismember(j, [1,4,7])
+        set(gca,'ytick',[0.5,0.7,0.9]);
+    else
+        set(gca,'ytick',[]);
+    end
+    if ismember(j, [7,8,9])
+        set(gca,'xtick',[1e4,3e4,5e4]);
+    else
+        set(gca,'xtick',[]);
     end
 end
-ax = nexttile(4); ax.YLabel.String = 'Percentage'; ax.FontSize = 13;
-ax = nexttile(8); ax.XLabel.String = 'Correlation';ax.FontSize = 13;
+ax = nexttile(4); ax.YLabel.String = 'Correlation';
+ax = nexttile(8); ax.XLabel.String = 'Distance to calving front (m)';
 
 exportgraphics(gcf,['plots/correlation_',md_type,'_',geom_type,'.pdf'],"ContentType","vector")

@@ -143,7 +143,7 @@ for j = 1:n_simu
     % read the model
     group = folder_dir_groups{shallowGL_i};
     expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
-    % plot the delta H
+    % plot the delta H 
     deltaH = expt.results.TransientSolution(end).Surface - ...
              expt.results.TransientSolution(1).Surface;
     % crop the extents
@@ -216,6 +216,9 @@ for j = 1:n_simu
 end
 
 %% Make tiled plots
+load('plots/colormap/davos.mat'); load('plots/colormap/lajolla.mat')
+lajolla = lajolla(80:end,:);
+
 % shallower
 figure('Position',[200,200,500,500]);
 h = tiledlayout(3,3, 'TileSpacing', 'none');
@@ -223,52 +226,56 @@ for j = 1:n_simu
     nexttile
     imagesc(deltaH_expt{j,shallowGL_i}.x, deltaH_expt{j,shallowGL_i}.y,...
             deltaH_expt{j,shallowGL_i}.data - deltaH_ctrl{j,shallowGL_i}.data);
-    colormap("pink")
+    colormap(davos)
     clim([-300,0])
     hold on
     % select the data for this glacier
+    % although you should expect to see no grounding line in shallow ones
+    % since terminus coincides with the GL here.
     gl_data = gl_cells_expt{j,shallowGL_i};
+    gl_color = interp1(1:size(lajolla,1),flipud(lajolla),linspace(1,size(lajolla,1),length(gl_data.data)));
     for k = 1:length(gl_data.data)
-        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 5,'filled',... ...
+        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 8,'filled',... ...
                 'MarkerFaceAlpha',0.3,'MarkerEdgeAlpha',0.3);
         hold on
     end
-    colororder(cool(length(gl_data.data)))
+    colororder(gl_color)
     set(gca, 'xtick', [])
     set(gca, 'ytick', [])
 end
+
 cb = colorbar;
 cb.Layout.Tile = 'east';
-cb.Title.String = 'Change in elevation (m)';
-cb.FontSize = 15;
-cb.FontName = 'Times';
+ylabel(cb, 'Change in elevation (m)','FontSize',15,'Interpreter','latex')
 exportgraphics(gcf,'plots/dH_from_feedback_shallowGL.png','Resolution',300)
 
 %% deeper
+load('plots/colormap/davos.mat'); load('plots/colormap/lajolla.mat')
+lajolla = lajolla(80:end,:);
+
 figure('Position',[800,200,800,800]);
 h = tiledlayout(3,3, 'TileSpacing', 'tight');
 for j = 1:n_simu
     nexttile
     imagesc(deltaH_expt{j,deeperGL_i}.x, deltaH_expt{j,deeperGL_i}.y,...
             deltaH_expt{j,deeperGL_i}.data - deltaH_ctrl{j,deeperGL_i}.data);
-    colormap("pink")
-    clim([-350,0])
+    colormap(davos)
+    clim([-300,0])
     hold on;
-    % select the data for this glacier
+    % grounding line as scattered points
     gl_data = gl_cells_expt{j,deeperGL_i};
+    gl_color = interp1(1:size(lajolla,1),flipud(lajolla),linspace(1,size(lajolla,1),length(gl_data.data)));
     for k = 1:length(gl_data.data)
-        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 5,'filled',... ...
+        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 8,'filled',... ...
                 'MarkerFaceAlpha',0.3,'MarkerEdgeAlpha',0.3);
         hold on
     end
-    colororder(cool(length(gl_data.data)))
+    colororder(gl_color)
     set(gca, 'xtick', [])
     set(gca, 'ytick', [])
 
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
-ylabel(cb,'Change in elevation (m)','Interpreter','latex','FontSize',15);
-% cb.FontSize = 15;
-% cb.FontName = 'Times';
+ylabel(cb, 'Change in elevation (m)','FontSize',15,'Interpreter','latex')
 exportgraphics(gcf,'plots/dH_from_feedback_deepGL.png','Resolution',300)

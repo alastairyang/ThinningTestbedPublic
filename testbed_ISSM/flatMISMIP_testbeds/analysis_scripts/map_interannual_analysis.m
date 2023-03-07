@@ -73,7 +73,9 @@ LTs_cl = zeros(n_simu, 1200);
 gl_ctrl = zeros(n_simu,1);
 gl_expt = zeros(n_simu,1);
 
-for j = [1,3,7,9]
+figure('Position',[100,100,1000,600])
+tiledlayout(2,3,'TileSpacing','none')
+for j = 3%[1,3,7,9]
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -176,23 +178,22 @@ for j = [1,3,7,9]
 %     plot_title = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type,'.png'];
 %     exportgraphics(gcf,['plots/pulse_mu_plots/',plot_title],'Resolution',300)
 
-%     % plotting animation
-%     [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
-%     figure('Position',[100,100,1100,450]);
-%     for i = 1:260
-%         subplot(2,1,1);imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
-%         subplot(2,1,2);imagesc(x,y,squeeze(H_grid(i,:,:)));title(num2str(i/10));hold on; clim([0,800]);colorbar;
-%         pause(0.05);
+    % plotting animation
+    [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
+    figure('Position',[100,100,1100,450]);
+    for i = 1:260
+        imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
+        pause(0.01);
+    end
+    is = [178,188];
+%     if j == 3
+%         is = [118, 198];
 %     end
-    is = [198,208];
-    if j == 3
-        is = [118, 198];
-    end
-    if j == 9
-        is = [118, 192];
-    end
+%     if j == 9
+%         is = [118, 192];
+%     end
 
-    % plot the grounding line position over time
+    % retrieve grounding line position over time
     t_expt = results_tbl_expt.time;
     t_ctrl = results_tbl_ctrl.time;
     gls_expt = zeros(size(t_expt));
@@ -207,6 +208,8 @@ for j = [1,3,7,9]
 
     datas = md_grid(:,:,is);
     snapshots_fig = plot_result_snapshots(x, y, datas, W);
+
+    % PLOT!
     nexttile(3,[2,1])
     t_shift = t_ctrl-t_ctrl(1);
     plot(gls_diff, t_shift,'-k','LineWidth',1); 
@@ -226,7 +229,7 @@ for j = [1,3,7,9]
     disp(['model ',snps_plot_title(1:end-4), ' is processed!'])
 end
 
-%% Polynomial Detrending iteration
+%% OUTDATED: Polynomial Detrending iteration
 for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
@@ -290,22 +293,6 @@ for j = 1:n_simu
     % cyclic: find range (max - min)
     last_LTs = -1*squeeze(LTs(:,:,end));
     STs_range = STs_max - STs_min;
-
-%     figure('Position',[100,100,1100,400]);
-%     t = tiledlayout(2,2);
-%     title(t,md_name,'interpreter','none')
-%     nexttile;
-%     imagesc(x,y,last_LTs); colorbar; clim([0,15]);
-%     title('Total thinning from trend component'); ylabel('Meter')
-%     nexttile;
-%     plot(0:0.1:26-0.1, squeeze(LTs_time_min)); xlim([0,26])
-%     title('Thinning trend'); xlabel('Year')
-%     nexttile;
-%     imagesc(x,y,STs_range);colorbar;clim([0,15]);
-%     title('cyclic magnitude'); 
-%     nexttile;
-%     imagesc(x,y,STs_std); colorbar;clim([0,15]);
-%     title('1 std cyclic mangitude')
 
     % get the corresponding symbols for this scatter plot
     W_symbs(j,1) = Ws_symb(W==Ws);
