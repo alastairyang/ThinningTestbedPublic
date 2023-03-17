@@ -25,6 +25,17 @@ gauss_perturb_repeat_tscale = 2; % repeat time period for both pulse and diffuse
 pulse_gauss_tshift = 0.5; % for each repeat t cycle, the pulse is placed at the given time (yr) after the start
 ds = 100; % grid spacing (m), when interpolate from mesh to grid
 
+table_vals  = [meshsize,  perturb_duration, no_retreat_duration,   terminus0_x,  retreat_rate_max,...
+              seasonal_retreat_rate_max, calve_seasonal_max,   gauss_xloc, gauss_mag, gauss_width_ratio, ...
+              gauss_timestep, pulse_gauss_tscale,   diffu_gauss_tscale,  gauss_efold, gauss_perturb_repeat_tscale,...
+              pulse_gauss_tshift, ds];
+table_names = ["meshsize","perturb_duration","no_retreat_duration","terminus0_x","retreat_rate_max",...
+             "seasonal_retreat_rate_max","calve_seasonal_max","gauss_xloc","gauss_mag","gauss_width_ratio",...
+             "gauss_timestep","pulse_gauss_tscale","diffu_gauss_tscale","gauss_efold", "gauss_perturb_repeat_tscale",...
+             "pulse_gauss_tshift","ds"];
+runme_param = array2table(table_vals, 'VariableNames',table_names);
+writetable(runme_param, 'runme_param.csv')
+
 % Gaussian basal perturbation simulation titles
 pulse_gauss_title = ['Transient_Calving_PulseGaussianPerturb_', num2str(gauss_mag*10)];
 diffu_gauss_title = ['Transient_Calving_DiffuGaussianPerturb_', num2str(gauss_mag*10)];
@@ -67,7 +78,7 @@ for jj = 13
     end
 
     % step iteration
-    for steps = [11,12]
+    for steps = 12
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);

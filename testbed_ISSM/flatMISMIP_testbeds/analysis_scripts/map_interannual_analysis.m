@@ -1,12 +1,10 @@
 %% Map view: analyze localized basal perturbation
-% here we use mode decomposition to decompose the H(x,y,t) from the
-% localized basal perturbation experiment. The goal is to arrive at a
-% simple clean data reduction that shows the impact of the localized basal
-% perturbation: the magnitude of cyclic and trend change
+% here we plot the map view of elevation change data and the relative
+% grounding line movement
 
 %% Experiment with polynomial de-trending
 gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
-pulse_type = 'Pulse'; % types: "Diffu","Pulse"
+pulse_type = 'Diffu'; % types: "Diffu","Pulse"
 geom_type = 'deep'; % types: "deep", "shallow"
 expt_type = 'mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
 
@@ -75,7 +73,7 @@ gl_expt = zeros(n_simu,1);
 
 figure('Position',[100,100,1000,600])
 tiledlayout(2,3,'TileSpacing','none')
-for j = 3%[1,3,7,9]
+for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -144,6 +142,7 @@ for j = 3%[1,3,7,9]
     % color: from nearest to the furthest
     color_axis = transpose(linspace(min(abs_dist), max(abs_dist),length(dist))); % 10^0 to 10^4
 
+    snps_plot_title = [md_ctrl.miscellaneous.name(9:end) '_' pulse_type '_' geom_type '_' expt_type '.png'];
 %     figure('Position',[100,100,1100,500]);
 %     % iterate over each line / control point
 %     for i = 1:length(dist)
@@ -178,13 +177,21 @@ for j = 3%[1,3,7,9]
 %     plot_title = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type,'.png'];
 %     exportgraphics(gcf,['plots/pulse_mu_plots/',plot_title],'Resolution',300)
 
-    % plotting animation
-    [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
-    figure('Position',[100,100,1100,450]);
-    for i = 1:260
-        imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
-        pause(0.01);
-    end
+%     % plotting animation: H(t)
+%     [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
+%     figure('Position',[100,100,1100,450]);
+%     for i = 1:260
+%         imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
+%         pause(0.005);
+%     end
+%     % plotting animation: dH(t)/dt
+%     dt = 0.1;
+%     figure('Position',[100,100,1100,450]);
+%     for i = 2:260
+%         imagesc(x,y,squeeze((md_grid(:,:,i)-md_grid(:,:,i-1))/dt));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
+%         pause(0.005);
+%     end
+
     is = [178,188];
 %     if j == 3
 %         is = [118, 198];
@@ -206,25 +213,120 @@ for j = 3%[1,3,7,9]
     gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
     gls_diff = gls_expt_interp - gls_ctrl;
 
-    datas = md_grid(:,:,is);
-    snapshots_fig = plot_result_snapshots(x, y, datas, W);
-
-    % PLOT!
-    nexttile(3,[2,1])
-    t_shift = t_ctrl-t_ctrl(1);
-    plot(gls_diff, t_shift,'-k','LineWidth',1); 
-    % add the times of the two snapshots
-    hold on;
-    scatter(gls_diff(is), t_shift(is),40,'filled','red');
-    set(gca, 'YDir','reverse'); ylim([0,26]);
-    xlabel('Relative grounding line position (m)','Interpreter','latex','FontSize',13)
-    ylabel('Time (yr)','Interpreter','latex','FontSize',13)
-
-    % save the graphics
-    snps_plot_title = [md_ctrl.miscellaneous.name(9:end) '_' pulse_type '_' geom_type '_' expt_type '.png'];
-    exportgraphics(gcf,['plots/pulse_mu_plots/snapshots/' snps_plot_title], 'Resolution', 300)
+    % make static snapshot plots
+%     datas = md_grid(:,:,is);
+%     snapshots_fig = plot_result_snapshots(x, y, datas, W);
+% 
+%     % PLOT!
+%     nexttile(3,[2,1])
+%     t_shift = t_ctrl-t_ctrl(1);
+%     plot(gls_diff, t_shift,'-k','LineWidth',1); 
+%     % add the times of the two snapshots
+%     hold on;
+%     scatter(gls_diff(is), t_shift(is),40,'filled','red');
+%     set(gca, 'YDir','reverse'); ylim([0,26]);
+%     xlabel('Relative grounding line position (m)','Interpreter','latex','FontSize',13)
+%     ylabel('Time (yr)','Interpreter','latex','FontSize',13)
+% 
+%     % save the graphics
+%     exportgraphics(gcf,['plots/pulse_mu_plots/snapshots/' snps_plot_title], 'Resolution', 300)
     
+    % make a GIF
+    ds = mean(x(2:end)-x(1:end-1));
+    W_eff = 0.5*W;
+    x_up  = 1e4; % upstream limit for cropping
+    x_down = 5e4; % downstream limit for cropping, close to the initial terminus
+    % cropping parameters
+    yi_mid = floor(length(y)/2);
+    yi_low = yi_mid - floor(W_eff/ds);
+    yi_up  = yi_mid + floor(W_eff/ds);
+    xi_up = floor(x_up/ds);
+    xi_down = floor(x_down/ds);
+    fig_length = 900;
+    n_snapshots = 1;
+    fig_width  = 400;
 
+    gif(['plots/gifs/',snps_plot_title(1:end-4),'.gif'])
+    fig = figure('Position',[100,100,fig_length, fig_width]);
+    tiledlayout(2,4,'TileSpacing','compact')
+    for ii = 1:260
+        % first plot the map view of H(t)
+        gif('frame',gcf)
+        nexttile(1,[1,2])
+        data = squeeze(md_grid(:,:,ii));
+        % cropped axis
+        data_c = data(yi_low:yi_up, xi_up:xi_down);
+        x_c = x(xi_up:xi_down);
+        y_c = y(yi_low:yi_up);
+        % mesh plot
+        s = imagesc(x_c, y_c, data_c); hold on;
+        %view(30, 35)
+        set(gca,'DataAspectRatio',[1 1 1]) % axis scaling; emphasize z axis
+        axis off;
+        grid off; box off; 
+        colormap(diverg_colormap(50)); clim([-7,7]);
+        colorbar
+
+        % then plot the map view of dH(t)/dt
+        nexttile(5,[1,2])
+        dt = 0.1;
+        if ii == 1
+            data = zeros(size(md_grid(:,:,ii)));
+        else
+            data = squeeze(md_grid(:,:,ii)-md_grid(:,:,ii-1))/dt;
+        end
+        % cropped axis
+        data_c = data(yi_low:yi_up, xi_up:xi_down);
+        x_c = x(xi_up:xi_down);
+        y_c = y(yi_low:yi_up);
+        % mesh plot
+        s = imagesc(x_c, y_c, data_c); hold on;
+        %view(30, 35)
+        set(gca,'DataAspectRatio',[1 1 1]) % axis scaling; emphasize z axis
+        axis off;
+        grid off; box off; 
+        colormap(diverg_colormap(50)); clim([-7,7]);
+        colorbar
+
+        % add grounding line
+        nexttile(3,[2,1])
+        t_shift = t_ctrl-t_ctrl(1);
+        plot(gls_diff, t_shift,'-k','LineWidth',1); 
+        % add the times of the two snapshots
+        hold on;
+        % add the time as a dot
+        scatter(gls_diff(ii), t_shift(ii),40,'filled','red');
+        set(gca, 'YDir','reverse'); ylim([0,26]);
+        xlabel('Relative grounding line position (m)','Interpreter','latex','FontSize',13)
+        ylabel('Time (yr)','Interpreter','latex','FontSize',13)
+        pause(0.05)
+        sgtitle(['Time = ',num2str(ii/10)]);
+
+        % add forcing plot
+        nexttile(4,[2,1])
+        switch pulse_type
+            case "Diffu"
+                [~, pulse, gauss_t] = make_localized_forcing_timeseries();
+            case "Pulse"
+                [pulse, ~, gauss_t] = make_localized_forcing_timeseries();
+            otherwise
+                error('Unknown pulse type!')
+        end
+        plot(pulse, gauss_t,'-k','LineWidth',1); 
+        % add the times of the two snapshots
+        hold on;
+        % add the time as a dot
+        pulse_dot = interp1(gauss_t, pulse, t_shift(ii));
+        scatter(pulse_dot, t_shift(ii),40,'filled','red'); hold off
+        set(gca, 'YDir','reverse'); ylim([0,26]);
+        xlabel('$\alpha$','Interpreter','latex','FontSize',13)
+        ylabel('Time (yr)','Interpreter','latex','FontSize',13)
+
+        pause(0.05)
+        sgtitle(['Time = ',num2str(ii/10)]);
+
+    end
+    
     % report
     disp(['model ',snps_plot_title(1:end-4), ' is processed!'])
 end

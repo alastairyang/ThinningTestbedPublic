@@ -9,6 +9,7 @@
 % Here we use the data sampled and saved from the model class (saved in
 % "analyzed_data" folder). We look at the experiment and control runs
 % simultaneously.
+geom_type = 'deep';
 perturb_index = 8;
 n_gcp = 20;
 gauss_xloc = 3.2e4; % gaussian patch location from ice divide
@@ -80,7 +81,6 @@ end
 [~, deeperGL_i]  = max(GLs);
 
 %% Analyze
-geom_type = 'deep';
 
 switch geom_type
     case 'deep'

@@ -1,13 +1,148 @@
-%% Estimate wave velocity due to localized basal perturbation
-% The idea is similar to how we estimate the wave velocity in the effective
-% pressure experiment -- tracking the arrival time of the signal peak and
-% perform linear regression.
-%% Main script
+%% Plot h(t) of center flowline from localized basal perturbation
+%% The whole center line (no sampling) tabulated along the time axis
 gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
 gcp_ds = 2000; % sampling spacing for ground control points
 ds = 50; % regular meshgrid spacing
-pulse_type = 'Diffu'; % types: "Diffu","Pulse"
-geom_type = 'shallow'; % types: "deep", "shallow"
+pulse_type = 'Pulse'; % types: "Diffu","Pulse"
+geom_type = 'deep'; % types: "deep", "shallow"
+expt_type = 'no_mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
+
+% model parameters and plot parameters
+% read in the model parameter table
+md_vars = readtable('md_var_combinations.csv');
+Ws = sort(unique(md_vars.('fjord_width')));
+GLs = sort(unique(md_vars.('delta_groundingline_depth')));
+FCs = sort(unique(md_vars.('background_friccoef')));
+% get all model foldernames
+foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
+foldernames_tbl = struct2table(foldernames);
+bools = cellfun(@(s) ~strcmp(s(1),'.'), foldernames_tbl.name);
+foldernames_tbl = foldernames_tbl(bools,:);
+% read the runme parameters
+runme_params = readtable('runme_param.csv');
+
+% split the folder_dir into two groups, separated by grounding line depth
+folder_dir_groups = cell(1,2);
+for i = 1:length(GLs)
+    % skip the irrelevant ones
+    GL_bool = zeros(size(foldernames_tbl,1),1);
+    for j = 1:size(foldernames_tbl.name)
+        GL_bool(j) = compare_GLvalue(foldernames_tbl.name(j), GLs(i));
+    end
+    % save the respective folder items to a cell
+    folder_dir_groups{i} = foldernames_tbl(find(GL_bool),:); %#ok<FNDSB> 
+end
+
+% we divide the dicussions by the grounding line depth
+[~, shallowGL_i] = min(GLs);
+[~, deeperGL_i]  = max(GLs);
+
+switch geom_type
+    case 'deep'
+        geom_i = deeperGL_i;
+    case 'shallow'
+        geom_i = shallowGL_i;
+    otherwise
+        warning('unknown depth specification!')
+end
+switch expt_type
+    case 'no_mu'
+        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        expt_name = ['MISMIP_yangTransient_Calving_',pulse_type,'GaussianPerturb_8.mat'];
+    case 'mu'
+        ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+        expt_name = ['MISMIP_yangTransient_Calving_MassUnloading_',pulse_type,'GaussianPerturb_8.mat'];
+    otherwise
+        error('Unknown experiment type!')
+end
+
+n_simu = size(folder_dir_groups{geom_i}, 1);
+for j = 1:n_simu
+    % read the model
+    group = folder_dir_groups{geom_i};
+    md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
+    md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
+    results_tbl_expt = struct2table(md_expt.results.TransientSolution);
+    results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
+    % get model information
+    modelname = md_ctrl.miscellaneous.name;
+    [W, GL, FC] = parse_modelname(modelname);
+    % isolate the delta H from localized basal perturbation
+    expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Surface{:}]', results_tbl_ctrl.time,'linear','extrap'));
+    deltaH = expt_H_interp - [results_tbl_ctrl.Surface{:}];
+    deltaH_cell = num2cell(deltaH,1);
+    [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, ds);
+    % mask out non-ice part
+    [mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, ds);
+    md_grid(mask_grid>0) = nan;
+    md_grid = permute(md_grid,[2,3,1]);
+
+    % add the grounding line and signal
+    % retrieve grounding line position over time
+    t_expt = results_tbl_expt.time;
+    t_ctrl = results_tbl_ctrl.time;
+    gls_expt = zeros(size(t_expt));
+    gls_ctrl = zeros(size(t_ctrl));
+    for i = 1:260
+        gls_expt(i) = locate_groundingline(md_expt, md_expt.results.TransientSolution(i).MaskOceanLevelset);
+        gls_ctrl(i) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset);
+    end
+    % interpolate
+    gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
+    gls_diff = gls_expt_interp - gls_ctrl;
+
+    % crop the initial 5 years no-perturbation period, and some extra
+    % padding beyond the calving front
+    start_t = 5; dt = 0.1; end_t = 26;
+    md_grid = md_grid(:,:,start_t/dt+1:end);
+    md_grid = md_grid(:,x<=runme_params.terminus0_x,:);
+    mid_y = floor(size(md_grid,1)/2);
+    md_grid_mids = squeeze(md_grid(mid_y,:,:));
+
+    ff = figure('Position',[100,100,700,600]);
+    plot_t = 0:0.1:size(md_grid_mids, 2)/10;
+    plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
+    imagesc(plot_x, plot_t, md_grid_mids, 'AlphaData',~isnan(md_grid_mids));
+    axis off
+    switch pulse_type
+        case "Diffu"
+            clim([-10,10]);
+            [~, pulse, pulse_t] = make_localized_forcing_timeseries();
+        case "Pulse"
+            clim([-5,5]);
+            [pulse, ~, pulse_t] = make_localized_forcing_timeseries();
+        otherwise
+            error('Unknown type!')
+    end
+    colormap(diverg_colormap(50));
+    % plot the grounding line as an inset
+    p = get(gca, 'Position'); cb = colorbar; set(cb,'Position',[cb.Position(1)+0.10 cb.Position(2) cb.Position(3) cb.Position(4)]);
+    inset_y = 0.2;
+    pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3) p(4)*inset_y]);
+    plot_gl_t = t_ctrl - t_ctrl(1);
+    yyaxis left
+    anomaly(plot_gl_t(start_t/dt+1:end), gls_diff(start_t/dt+1:end))
+    hold on;
+    set(gca, 'YDir','reverse')
+    xlim([start_t, end_t]); ylabel('Relative GL(m)','FontName','Aria','FontSize',12)
+    % add pulse
+    %ax2 = axes('Parent', gcf, 'Position', [p(1) p(2) p(3) p(4)]);
+    yyaxis right
+    plot(pulse_t, pulse,'r','LineWidth',1.5); 
+    switch pulse_type; case "Diffu"; ylim([0,0.4]); case "Pulse"; ylim([0,1]);otherwise; error('Unknown type');end; 
+    ylabel('$\alpha$','Interpreter','latex','FontSize',15)
+
+    plot_name = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type];
+    exportgraphics(gcf, ['plots/localized_stacked_ht/',plot_name,'.png'],'BackgroundColor','none','Resolution',300)
+    
+
+end
+%% OUDATED: sample selected control points upstream and downstream of the perturbation
+gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
+gcp_ds = 2000; % sampling spacing for ground control points
+ds = 50; % regular meshgrid spacing
+pulse_type = 'Pulse'; % types: "Diffu","Pulse"
+geom_type = 'deep'; % types: "deep", "shallow"
 expt_type = 'mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
 
 % model parameters and plot parameters
@@ -51,7 +186,6 @@ switch geom_type
     otherwise
         warning('unknown depth specification!')
 end
-
 switch expt_type
     case 'no_mu'
         ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
@@ -167,7 +301,7 @@ for j = 1:n_simu
     
 end
 
-%% WELL THIS IS Unfinished...
+%% WELL THIS IS Unfinished...(still trying to measure the wave velocity)
 % next idea is to just select a few points near the perturbation (rather
 % than throughout the whole domain right now), if we were to really measure
 % the velocity...

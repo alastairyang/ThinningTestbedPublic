@@ -216,48 +216,82 @@ for j = 1:n_simu
 end
 
 %% Make tiled plots
+geom_type = "shallow";
+switch geom_type
+    case "deep"
+        geom_i = deeperGL_i;
+    case "shallow"
+        geom_i = shallowGL_i;
+    otherwise
+        error("Unknown type!")
+end
+% load colormaps
 load('plots/colormap/davos.mat'); load('plots/colormap/lajolla.mat')
 lajolla = lajolla(80:end,:);
 
-% shallower
-figure('Position',[200,200,500,500]);
+% make figure
+figure('Position',[200,200,800,800]);
 h = tiledlayout(3,3, 'TileSpacing', 'none');
 for j = 1:n_simu
     nexttile
-    imagesc(deltaH_expt{j,shallowGL_i}.x, deltaH_expt{j,shallowGL_i}.y,...
-            deltaH_expt{j,shallowGL_i}.data - deltaH_ctrl{j,shallowGL_i}.data);
+    xx = deltaH_expt{j,geom_i}.x/1000;
+    yy = deltaH_expt{j,geom_i}.y/1000;
+    [XX, YY] = meshgrid(xx, yy);
+    dH = deltaH_expt{j,geom_i}.data - deltaH_ctrl{j,geom_i}.data;
+    imagesc(xx, yy,dH);
     colormap(davos)
     clim([-300,0])
     hold on
+    contour(XX, YY, dH, 3, '-k','ShowText','on',"LabelFormat","%0.0f m") % 5 contour levels
+    % add contour lines
     % select the data for this glacier
     % although you should expect to see no grounding line in shallow ones
     % since terminus coincides with the GL here.
-    gl_data = gl_cells_expt{j,shallowGL_i};
+    gl_data = gl_cells_expt{j,geom_i};
     gl_color = interp1(1:size(lajolla,1),flipud(lajolla),linspace(1,size(lajolla,1),length(gl_data.data)));
     for k = 1:length(gl_data.data)
-        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 8,'filled',... ...
+        scatter(gl_data.data{k}(1).x/1000, gl_data.data{k}(1).y/1000, 8,'filled',... ...
                 'MarkerFaceAlpha',0.3,'MarkerEdgeAlpha',0.3);
         hold on
     end
     colororder(gl_color)
-    set(gca, 'xtick', [])
-    set(gca, 'ytick', [])
+    % bottom row: x-axis
+    if ismember(j,[7,8,9])
+        set(gca,'xtick',[20,30,40])
+    else
+        set(gca, 'xtick', [])
+    end
+    % left column: y-axis
+    if ismember(j,[1,4,7])
+        set(gca,'ytick',[4,8])
+    else
+        set(gca,'ytick',[])
+    end
+    if j == 4
+        ylabel('Across flow (km)','FontName','Aria','FontSize',13)
+    end
+    if j == 8
+        xlabel('Along flow (km)','FontName','Aria','FontSize',13)
+    end
+
+    
 end
 
 cb = colorbar;
 cb.Layout.Tile = 'east';
 ylabel(cb, 'Change in elevation (m)','FontSize',15,'Interpreter','latex')
-exportgraphics(gcf,'plots/dH_from_feedback_shallowGL.png','Resolution',300)
+plot_name = "dH_effect_pressure_"+geom_type'+".png";
+exportgraphics(gcf,"plots/"+plot_name,'Resolution',300)
 
 %% deeper
 load('plots/colormap/davos.mat'); load('plots/colormap/lajolla.mat')
 lajolla = lajolla(80:end,:);
 
-figure('Position',[800,200,800,800]);
+figure('Position',[200,200,800,800]);
 h = tiledlayout(3,3, 'TileSpacing', 'tight');
 for j = 1:n_simu
     nexttile
-    imagesc(deltaH_expt{j,deeperGL_i}.x, deltaH_expt{j,deeperGL_i}.y,...
+    imagesc(deltaH_expt{j,deeperGL_i}.x/1000, deltaH_expt{j,deeperGL_i}.y/1000,...
             deltaH_expt{j,deeperGL_i}.data - deltaH_ctrl{j,deeperGL_i}.data);
     colormap(davos)
     clim([-300,0])
@@ -266,13 +300,29 @@ for j = 1:n_simu
     gl_data = gl_cells_expt{j,deeperGL_i};
     gl_color = interp1(1:size(lajolla,1),flipud(lajolla),linspace(1,size(lajolla,1),length(gl_data.data)));
     for k = 1:length(gl_data.data)
-        scatter(gl_data.data{k}(1).x, gl_data.data{k}(1).y, 8,'filled',... ...
+        scatter(gl_data.data{k}(1).x/1000, gl_data.data{k}(1).y/1000, 8,'filled',... ...
                 'MarkerFaceAlpha',0.3,'MarkerEdgeAlpha',0.3);
         hold on
     end
     colororder(gl_color)
-    set(gca, 'xtick', [])
-    set(gca, 'ytick', [])
+    % bottom row: x-axis
+    if ismember(j,[7,8,9])
+        set(gca,'xtick',[20,30,40])
+    else
+        set(gca, 'xtick', [])
+    end
+    % left column: y-axis
+    if ismember(j,[1,4,7])
+        set(gca,'ytick',[4,8])
+    else
+        set(gca,'ytick',[])
+    end
+    if j == 4
+        ylabel('Across flow (km)','FontName','Aria','FontSize',13)
+    end
+    if j == 8
+        xlabel('Along flow (km)','FontName','Aria','FontSize',13)
+    end
 
 end
 cb = colorbar;
