@@ -1,56 +1,66 @@
+load('long_models_yang/model_W11000_GL400_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat')
+
 % peclet number studies
 nt = size(md.results.TransientSolution,2);
 ds = 50;
 smooth_span = 30;
-for i = 1
+sampled_ti = 1:20:nt;
+[~,x,y] = mesh_to_grid(index, meshx, meshy, md.friction.C(1:end-1,i),ds);
+% pre-allocate
+Pes = zeros(length(sampled_ti), length(x));
+
+count = 0;
+for i = sampled_ti
+    count = count+1;
     year = md.results.TransientSolution(i).time;
     index = md.mesh.elements;
     meshx = md.mesh.x;
     meshy = md.mesh.y;
-    k = mesh_to_grid(index, meshx, meshy, md.friction.C(1:end-1,i));
-    H = mesh_to_grid(index, meshx, meshy, md.results.TransientSolution(i).Thickness);
+    [k,~,~] = mesh_to_grid(index, meshx, meshy, md.friction.C(1:end-1,i),ds);
+    [H,~,~] = mesh_to_grid(index, meshx, meshy, md.results.TransientSolution(i).Thickness,ds);
+    [mask,~,~] = mesh_to_grid(index, meshx, meshy, md.results.TransientSolution(i).MaskOceanLevelset,ds);
+    % make floating parts nan
     hw = md.results.TransientSolution(i).Base;
     hw(hw>0) = 0;
     pw = hw.*(md.materials.rho_water/md.materials.rho_ice);
-    pw = mesh_to_grid(index, meshx, meshy, pw);
-    s = mesh_to_grid(index, meshx, meshy, md.results.TransientSolution(i).Surface);
+    [pw,~,~] = mesh_to_grid(index, meshx, meshy, pw, ds);
+    [s,~,~] = mesh_to_grid(index, meshx, meshy, md.results.TransientSolution(i).Surface, ds);
     alpha = zeros(size(s));
+    smooth_n = 2000/ds;
     for j = 1:size(s,1)
-        alpha(j,:) = smooth(gradient(s(j,:), ds), 30);
+        alpha(j,:) = smooth(gradient(s(j,:), ds), smooth_n);
     end
     % now calculate C0, D0, grad(D0)
     C0 = compute_C0(k, H, alpha, pw);
     D0 = compute_D0(k, H, alpha, pw);
     grad_D0 = zeros(size(D0));
     for j = 1:size(s,1)
-        grad_D0(j,:) = smooth(gradient(D0(j,:), ds), 30);
+        grad_D0(j,:) = smooth(gradient(D0(j,:), ds), smooth_n);
     end
     %grad_D0 = compute_grad_D0(D0, ds);
     % distance to ice front
-    distance = mesh_to_grid(index, meshx, meshy, -1*md.results.TransientSolution(i).MaskIceLevelset);
+    [distance,~,~] = mesh_to_grid(index, meshx, meshy, -1*md.results.TransientSolution(i).MaskIceLevelset, ds);
     distance(distance<0) = 0;
     Pe = (C0 - grad_D0)./D0.*distance;
     % Pe across-flow average
     % the middle 20
-    if rem(size(Pe,1), 2) == 0
+    if rem(size(Pe,2), 1) == 0
         mid_i = size(Pe,1)/2;
     else
         mid_i = (size(Pe,1)+1)/2;
     end
-    Pe_mean = mean(Pe(mid_i-10:mid_i+10,:),1,'omitnan');
+    % only look at the middle 20 lines
+    Pe(mask<0) = nan;
+    Pes(count,:) = mean(Pe(mid_i-10:mid_i+10,:),1,'omitnan');
     
 end
 %% plot
-x = 0:ds:(size(Pe_mean,2)-1)*ds;
-figure;
-plot(x, low_fric_Pe);hold on
-plot(x, high_fric_Pe); hold off
-ylim([0,5])
-xlim([10000,50000])
-legend(["low friction","high friction"])
-xlabel('along flow distance (m)')
-ylabel('Peclet number')
-exportgraphics(gcf,'Pe_lowhigh_fric.png','Resolution',300)
+plot_x = 0:ds:(size(Pes,2)-1)*ds;
+figure; plot(plot_x/1000, Pes,'LineWidth',1);ylim([0,9]);colororder(cool(13))
+xlabel('Along flow distance (km)','FontName','Aria','FontSize',15)
+ylabel('Peclet Number','FontName','Aria','FontSize',15)
+plotname = ['Pe_evolv_', md.miscellaneous.name(9:end),'.png'];
+exportgraphics(gcf, ['plots/', plotname], 'Resolution',400)
 
 %% functions
 function C0 = compute_C0(k, H, alpha, pw)

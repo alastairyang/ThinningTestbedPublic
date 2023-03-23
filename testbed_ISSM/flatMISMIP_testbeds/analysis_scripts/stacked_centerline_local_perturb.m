@@ -12,7 +12,7 @@ expt_type = 'no_mu'; % types: "no_mu", "mu" (without mass-unloading; with mass u
 md_vars = readtable('md_var_combinations.csv');
 Ws = sort(unique(md_vars.('fjord_width')));
 GLs = sort(unique(md_vars.('delta_groundingline_depth')));
-FCs = sort(unique(md_vars.('background_friccoef')));
+FCs = sort(unique(md_vars.('bacckground_friccoef')));
 % get all model foldernames
 foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
 foldernames_tbl = struct2table(foldernames);

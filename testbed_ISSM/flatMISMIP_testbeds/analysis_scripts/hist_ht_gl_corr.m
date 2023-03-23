@@ -39,9 +39,6 @@ for i = 1:length(GLs)
     folder_dir_groups{i} = foldernames_tbl(find(GL_bool),:); %#ok<FNDSB> 
 end
 
-%% Process the data
-% iterate over Deep GL models
-
 % pre-allocate
 n_simu = size(folder_dir_groups{1}, 1);
 gl_lags = cell(2,n_simu);
@@ -68,7 +65,7 @@ for q = 1:length(GLs) % shallow, deep
         end
         [W, GL, FC] = parse_modelname(modelname);
         
-        % put thickness change over time into one big matrix
+        % put thickness change overtime into one big matrix
         result_tbl = struct2table(md.results.TransientSolution);
         n_time = size(result_tbl,1);
         h_mat = [];
