@@ -1,6 +1,6 @@
-%% H(t) timeseries correlation distribution with terminus and with grounding line
-% This study calculates the timeseries correlation and cross-correlation
-% between the dynamic elevation change and terminus / grounding line
+%% H(t) timeseries, terminus, and grounding line
+% This study calculates the lag time between H(t) and GL/terminus timeseries 
+% via cross-correlation
 
 %% Main script
 % parameters
