@@ -24,7 +24,7 @@ GLs_symb = ["square","o"];
 FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
 
 ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
-expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+expt_name = 'MISMIP_yangTransient_Calving_MassUnloading_Plastic.mat';
 % get all model foldernames
 foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
 foldernames_tbl = struct2table(foldernames);
@@ -281,7 +281,7 @@ cb = colorbar;
 cb.Layout.Tile = 'east';
 ylabel(cb, 'Change in elevation (m)','FontSize',15,'Interpreter','latex')
 plot_name = "dH_effect_pressure_"+geom_type'+".png";
-exportgraphics(gcf,"plots/"+plot_name,'Resolution',300)
+%exportgraphics(gcf,"plots/"+plot_name,'Resolution',300)
 
 %% deeper
 load('plots/colormap/davos.mat'); load('plots/colormap/lajolla.mat')
@@ -328,4 +328,4 @@ end
 cb = colorbar;
 cb.Layout.Tile = 'east';
 ylabel(cb, 'Change in elevation (m)','FontSize',15,'Interpreter','latex')
-exportgraphics(gcf,'plots/dH_from_feedback_deepGL.png','Resolution',300)
+%exportgraphics(gcf,'plots/dH_from_feedback_deepGL.png','Resolution',300)

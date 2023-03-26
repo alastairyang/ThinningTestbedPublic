@@ -1,13 +1,16 @@
 %% Plot h(t) of center flowline from localized basal perturbation
 % The whole center line (no sampling) tabulated along the time axis
 
-%% Plot only the difference between the control and experiment 
+%% Parameters
 % (thickness change attributed to the effective pressure dependence)
 gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
 gcp_ds = 2000; % sampling spacing for ground control points
 ds = 50; % regular meshgrid spacing
 geom_type = 'deep'; % types: "deep", "shallow"
+expt_type = "mu_plastic"; % types: "mu", "mu_plastic"
+retreat_stop_yr = 16; 
 
+%% Plot only the difference between the control and experiment 
 % model parameters and plot parameters
 % read in the model parameter table
 md_vars = readtable('md_var_combinations.csv');
@@ -41,6 +44,19 @@ end
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
 
+switch expt_type
+    case "mu"
+        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+        save_foldername = 'mu_stacked_ht';
+    case "mu_plastic"
+        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        expt_name = 'MISMIP_yangTransient_Calving_MassUnloading_Plastic.mat';
+        save_foldername = 'mu_plastic_stacked_ht';
+    otherwise
+        warning('Unkonwn experiment type!')
+end
+
 switch geom_type
     case 'deep'
         geom_i = deeperGL_i;
@@ -49,8 +65,6 @@ switch geom_type
     otherwise
         warning('unknown depth specification!')
 end
-ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
-expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
 
 
 n_simu = size(folder_dir_groups{geom_i}, 1);
@@ -103,28 +117,25 @@ for j = 1:n_simu
     gls_expt_c = gls_expt_interp(start_t/dt+1:end);
     gls_ctrl_c = gls_ctrl(start_t/dt+1:end);
 
+
     ff = figure('Position',[100,100,700,600]);
     plot_t = 0:0.1:size(md_grid_mids, 2)/10-0.1;
     plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
     imagesc(plot_t, plot_x, md_grid_mids, 'AlphaData',~isnan(md_grid_mids));
-    axis off
     colormap(davos);
     clim([-250,0]);
     hold on
-    plot(plot_t,gls_ctrl_c/1000,'r-.','LineWidth',1.5); hold on;
-    plot(plot_t,gls_expt_c/1000,'k-.','LineWidth',1.5); hold off
+    plot(plot_t,gls_ctrl_c/1000,'r-.','LineWidth',2.5); hold on;
+    plot(plot_t,gls_expt_c/1000,'b-.','LineWidth',2.5); hold on;
+    plot(retreat_stop_yr, plot_x/1000, 'k-.','LineWidth',2); hold off
+    legend(["Control GL", "Experiment GL","End of front retreat"])
 
-    plot_name = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type];
-    exportgraphics(gcf, ['plots/mu_stacked_ht/',plot_name,'.png'],'BackgroundColor','none','Resolution',300)
+    plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
+    exportgraphics(gcf, ['plots/',save_foldername,'/',plot_name,'.png'],'BackgroundColor','none','Resolution',300)
 
 end
 
 %% Plot full simulations: H(t) from the control and experiment side-by-side
-gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
-gcp_ds = 2000; % sampling spacing for ground control points
-ds = 50; % regular meshgrid spacing
-geom_type = 'deep'; % types: "deep", "shallow"
-
 % model parameters and plot parameters
 % read in the model parameter table
 md_vars = readtable('md_var_combinations.csv');
@@ -158,6 +169,19 @@ end
 [~, shallowGL_i] = min(GLs);
 [~, deeperGL_i]  = max(GLs);
 
+switch expt_type
+    case "mu"
+        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+        save_foldername = 'mu_stacked_ht';
+    case "mu_plastic"
+        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        expt_name = 'MISMIP_yangTransient_Calving_MassUnloading_Plastic.mat';
+        save_foldername = 'mu_plastic_stacked_ht';
+    otherwise
+        warning('Unkonwn experiment type!')
+end
+
 switch geom_type
     case 'deep'
         geom_i = deeperGL_i;
@@ -166,9 +190,6 @@ switch geom_type
     otherwise
         warning('unknown depth specification!')
 end
-ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
-expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
-
 
 n_simu = size(folder_dir_groups{geom_i}, 1);
 for j = 1:n_simu
@@ -197,23 +218,27 @@ for j = 1:n_simu
     expt_H_grid = expt_H_grid - expt_H_grid(:,:,1);
     ctrl_H_grid = ctrl_H_grid - ctrl_H_grid(:,:,1);
 
-    % add the grounding line and signal
-    % first retrieve grounding line position over time
+    % add the grounding line and front 
     t_expt = results_tbl_expt.time;
     t_ctrl = results_tbl_ctrl.time;
     gls_expt = zeros(size(t_expt));
+    cfs_expt = zeros(size(t_expt));
     gls_ctrl = zeros(size(t_ctrl));
+    cfs = zeros(size(t_ctrl));
     for i = 1:260
+        % grounding line
         gls_expt(i) = locate_groundingline(md_expt, md_expt.results.TransientSolution(i).MaskOceanLevelset);
         gls_ctrl(i) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset);
+        % calving front
+        cfs(i) = locate_calvingfront(md_ctrl, md_ctrl.results.TransientSolution(i).MaskIceLevelset);
     end
-    % if there is zero (usually the last point), we use the previous GL
+    % if there is zero (usually the last point), we use the previous
     % value
     zero_idx = find(gls_expt == 0); gls_expt(zero_idx) = gls_expt(zero_idx-1);
     zero_idx = find(gls_ctrl == 0); gls_ctrl(zero_idx) = gls_ctrl(zero_idx-1);
+    zero_idx = find(cfs == 0); cfs(zero_idx) = cfs(zero_idx-1);
     % interpolate
     gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
-    gls_diff = gls_expt_interp - gls_ctrl;
 
     % crop the initial 5 years no-perturbation period, and some extra
     % padding beyond the calving front
@@ -226,10 +251,12 @@ for j = 1:n_simu
     % center flowline stacked overtime
     expt_H_grid_mids = squeeze(expt_H_grid(mid_y,:,:));
     ctrl_H_grid_mids = squeeze(ctrl_H_grid(mid_y,:,:));
-    % also crop the grounding line position vector
+    % also crop the grounding line and calving front position vector
     gls_expt_c = gls_expt_interp(start_t/dt+1:end);
     gls_ctrl_c = gls_ctrl(start_t/dt+1:end);
+    cfs_c = cfs(start_t/dt+1:end);
 
+    % make the tiled plots
     ff = figure('Position',[100,100,700,600]);
     tiledlayout(1,2,'TileSpacing','none')
     plot_t = 0:0.1:size(expt_H_grid_mids, 2)/10-0.1;
@@ -237,24 +264,28 @@ for j = 1:n_simu
     [plot_T, plot_X] = meshgrid(plot_t, plot_x);
     nexttile
     contourf(plot_t, fliplr(plot_x), ctrl_H_grid_mids); % fliplr(plot_x) can be interpret as -> distance to ice front
-    %imagesc(plot_t, plot_x, ctrl_H_grid_mids, 'AlphaData',~isnan(ctrl_H_grid_mids));
     colormap(davos); clim([-250,0]); hold on;
-    plot(plot_t,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-.','LineWidth',1.5); hold on;
-    %contour(plot_T, plot_X, ctrl_H_grid_mids, 5);
-    set(gca,'ytick',[])
+    plot(plot_t,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
+    xline(retreat_stop_yr,'k:','LineWidth',2); hold on
+    % add calving front trace
+    plot(plot_t, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
+    
     nexttile
     contourf(plot_t, fliplr(plot_x), expt_H_grid_mids);
-    %imagesc(plot_t, fliplr(plot_x), expt_H_grid_mids, 'AlphaData',~isnan(expt_H_grid_mids))
     colormap(davos); clim([-250,0]); hold on;
-    %contour(plot_T, plot_X, expt_H_grid_mids, 5);
     set(gca,'ytick',[])
     colorbar
     hold on
-    plot(plot_t,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-.','LineWidth',1.5); hold on;
-    plot(plot_t,(runme_params.terminus0_x - gls_expt_c)/1000,'k-.','LineWidth',1.5); hold off
+    % add grounding line
+    plot(plot_t,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
+    plot(plot_t,(runme_params.terminus0_x - gls_expt_c)/1000,'b-','LineWidth',2.5); hold on;
+    xline(retreat_stop_yr,'k:','LineWidth',2); hold on
+    % add calving front trace
+    plot(plot_t, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
+    legend('','Control GL','Experiment GL','Retreat stops')
 
     plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
-    exportgraphics(gcf, ['plots/mu_stacked_ht/',plot_name,'.png'],'BackgroundColor','none','Resolution',300)
+    exportgraphics(gcf, ['plots/',save_foldername,'/',plot_name,'.png'],'BackgroundColor','none','Resolution',300)
 
 end
 
