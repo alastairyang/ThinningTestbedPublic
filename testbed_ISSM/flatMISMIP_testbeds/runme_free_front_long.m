@@ -579,12 +579,14 @@ for jj = 18
                 % calculate new fric coef
                 if it == 1 % initial condition: delta(H) = 0
                     deltaH = mu_time_mask_interp(it)*zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
                     C = C0;
                 else
-                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0);
+                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0); % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
-                C = mass_unloading(md, deltaH, k_budd, C0, C, ocean_mask,1);
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 % append time and assign
                 current_time = md.timestepping.start_time;
                 C_add_time = [C; current_time + dt_mu];
@@ -723,12 +725,14 @@ for jj = 18
                 % calculate new fric coef
                 if it == 1 % initial condition: delta(H) = 0
                     deltaH = mu_time_mask_interp(it)*zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
                     C = C0;
                 else
-                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0);
+                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0); % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
-                C = mass_unloading(md, deltaH, k_budd, C0, C, ocean_mask,1);
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 % append time and assign
                 current_time = md.timestepping.start_time;
                 C_add_time = [C; current_time + dt_mu];
@@ -1209,12 +1213,14 @@ for jj = 18
                 % calculate new fric coef
                 if it == 1 % initial condition: delta(H) = 0
                     deltaH = mu_time_mask_interp(it)*zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
                     C = C0;
                 else
-                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0);
+                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0); % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
-                C = mass_unloading(md, deltaH, k_budd, C0, C, ocean_mask,1);
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 C = C - delta_C_all(:,it);
                 C(C<0) = 0;
                 % append time and assign
@@ -1436,14 +1442,17 @@ for jj = 18
                 md.settings.output_frequency = 1;
 
                 % calculate new fric coef
+                % calculate new fric coef
                 if it == 1 % initial condition: delta(H) = 0
                     deltaH = mu_time_mask_interp(it)*zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
                     C = C0;
                 else
-                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0);
+                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0); % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
-                C = mass_unloading(md, deltaH, k_budd, C0, C, ocean_mask,1);
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 C = C - delta_C_all(:,it);
                 C(C<0) = 0;
                 % append time and assign
@@ -1612,11 +1621,6 @@ for jj = 18
                     Hi = H0 + deltaH;
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
-
-                % debugging
-                if it > 200 % in perturbation
-                    disp('stopped')
-                end
 
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, m_plastic);
                 % append time and assign

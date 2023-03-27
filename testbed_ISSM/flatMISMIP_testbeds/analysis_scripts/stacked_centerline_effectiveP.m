@@ -7,7 +7,7 @@ gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
 gcp_ds = 2000; % sampling spacing for ground control points
 ds = 50; % regular meshgrid spacing
 geom_type = 'deep'; % types: "deep", "shallow"
-expt_type = "mu_plastic"; % types: "mu", "mu_plastic"
+expt_type = "mu"; % types: "mu", "mu_plastic"
 retreat_stop_yr = 16; 
 
 %% Plot only the difference between the control and experiment 
@@ -282,10 +282,12 @@ for j = 1:n_simu
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
     % add calving front trace
     plot(plot_t, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
-    legend('','Control GL','Experiment GL','Retreat stops')
+    if j == 1
+        legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
+    end
 
     plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
-    exportgraphics(gcf, ['plots/',save_foldername,'/',plot_name,'.png'],'BackgroundColor','none','Resolution',300)
+    exportgraphics(gcf, ['plots/',save_foldername,'/',plot_name,'.png'],'Resolution',500)
 
 end
 

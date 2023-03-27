@@ -77,12 +77,7 @@ for i = 1:length(GLs) % iterate over the two grounding line depths
             gl_tbl = sortrows(gl_tbl, 'nods','descend');
             gls{i,j} = table2struct(gl_tbl(1,:));
         end
-%         if size(terminus{i,j},2) ~= 1
-%             terminus_tbl = struct2table(terminus{i,j});
-%             terminus_tbl = sortrows(terminus_tbl, 'nods','descend');
-%             terminus{i,j} = table2struct(terminus_tbl(1,:));
-%         end
-        
+
         modelname = md.miscellaneous.name(9:end);
         % save the model parameter
         l_idx = sub2ind([length(GLs),n_simu], i, j);
