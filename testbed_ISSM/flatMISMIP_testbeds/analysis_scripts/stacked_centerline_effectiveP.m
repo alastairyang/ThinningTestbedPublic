@@ -6,7 +6,7 @@
 gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
 gcp_ds = 2000; % sampling spacing for ground control points
 ds = 50; % regular meshgrid spacing
-geom_type = 'deep'; % types: "deep", "shallow"
+geom_type = 'shallow'; % types: "deep", "shallow"
 expt_type = "mu"; % types: "mu", "mu_plastic"
 retreat_stop_yr = 16; 
 
@@ -50,7 +50,7 @@ switch expt_type
         expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
         save_foldername = 'mu_stacked_ht';
     case "mu_plastic"
-        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
         expt_name = 'MISMIP_yangTransient_Calving_MassUnloading_Plastic.mat';
         save_foldername = 'mu_plastic_stacked_ht';
     otherwise
@@ -84,8 +84,8 @@ for j = 1:n_simu
     deltaH_cell = num2cell(deltaH,1);
     [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, ds);
     % mask out non-ice part
-    [mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, ds);
-    md_grid(mask_grid>0) = nan;
+    [ctrl_mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, ds);
+    md_grid(ctrl_mask_grid>0) = nan;
     md_grid = permute(md_grid,[2,3,1]);
 
     % add the grounding line and signal
@@ -175,7 +175,7 @@ switch expt_type
         expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
         save_foldername = 'mu_stacked_ht';
     case "mu_plastic"
-        ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
+        ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
         expt_name = 'MISMIP_yangTransient_Calving_MassUnloading_Plastic.mat';
         save_foldername = 'mu_plastic_stacked_ht';
     otherwise
@@ -202,16 +202,18 @@ for j = 1:n_simu
     % Get thickness data
     modelname = md_ctrl.miscellaneous.name;
     [W, GL, FC] = parse_modelname(modelname);
-    expt_H = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
+    %expt_H = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
+    expt_H = [results_tbl_expt.Surface{:}];
     ctrl_H = [results_tbl_ctrl.Surface{:}];
     expt_H_cell = num2cell(expt_H,1); 
     ctrl_H_cell = num2cell(ctrl_H,1);
-    [expt_H_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, expt_H_cell, ds);
+    [expt_H_grid, ~, ~] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, expt_H_cell, ds);
     [ctrl_H_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, ctrl_H_cell, ds);
     % mask out non-ice part
-    [mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, ds);
-    expt_H_grid(mask_grid>0) = nan;
-    ctrl_H_grid(mask_grid>0) = nan;
+    [ctrl_mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, ds);
+    [expt_mask_grid, ~, ~] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, results_tbl_expt.MaskIceLevelset, ds);
+    expt_H_grid(expt_mask_grid>0) = nan;
+    ctrl_H_grid(ctrl_mask_grid>0) = nan;
     expt_H_grid = permute(expt_H_grid,[2,3,1]);
     ctrl_H_grid = permute(ctrl_H_grid,[2,3,1]);
     % Thickness difference wrt the initial thickness
@@ -238,7 +240,6 @@ for j = 1:n_simu
     zero_idx = find(gls_ctrl == 0); gls_ctrl(zero_idx) = gls_ctrl(zero_idx-1);
     zero_idx = find(cfs == 0); cfs(zero_idx) = cfs(zero_idx-1);
     % interpolate
-    gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
 
     % crop the initial 5 years no-perturbation period, and some extra
     % padding beyond the calving front
@@ -252,36 +253,39 @@ for j = 1:n_simu
     expt_H_grid_mids = squeeze(expt_H_grid(mid_y,:,:));
     ctrl_H_grid_mids = squeeze(ctrl_H_grid(mid_y,:,:));
     % also crop the grounding line and calving front position vector
-    gls_expt_c = gls_expt_interp(start_t/dt+1:end);
+    gls_expt_c = gls_expt(start_t/dt+1:end);
     gls_ctrl_c = gls_ctrl(start_t/dt+1:end);
     cfs_c = cfs(start_t/dt+1:end);
+
+    plot_t_expt = 0:0.1:size(expt_H_grid_mids, 2)/10-0.1;
+    plot_t_ctrl = 0:0.1:size(ctrl_H_grid_mids, 2)/10-0.1;
+    plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
 
     % make the tiled plots
     ff = figure('Position',[100,100,700,600]);
     tiledlayout(1,2,'TileSpacing','none')
-    plot_t = 0:0.1:size(expt_H_grid_mids, 2)/10-0.1;
-    plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
-    [plot_T, plot_X] = meshgrid(plot_t, plot_x);
     nexttile
-    contourf(plot_t, fliplr(plot_x), ctrl_H_grid_mids); % fliplr(plot_x) can be interpret as -> distance to ice front
+    % plot control
+    contourf(plot_t_ctrl, fliplr(plot_x), ctrl_H_grid_mids); % fliplr(plot_x) can be interpret as -> distance to ice front
     colormap(davos); clim([-250,0]); hold on;
-    plot(plot_t,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
+    plot(plot_t_ctrl,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
     % add calving front trace
-    plot(plot_t, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
+    plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
     
+    % plot experiment
     nexttile
-    contourf(plot_t, fliplr(plot_x), expt_H_grid_mids);
+    contourf(plot_t_expt, fliplr(plot_x), expt_H_grid_mids);
     colormap(davos); clim([-250,0]); hold on;
     set(gca,'ytick',[])
     colorbar
     hold on
     % add grounding line
-    plot(plot_t,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
-    plot(plot_t,(runme_params.terminus0_x - gls_expt_c)/1000,'b-','LineWidth',2.5); hold on;
+    plot(plot_t_ctrl,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
+    plot(plot_t_expt,(runme_params.terminus0_x - gls_expt_c)/1000,'b-','LineWidth',2.5); hold on;
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
     % add calving front trace
-    plot(plot_t, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
+    plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
     if j == 1
         legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
     end
