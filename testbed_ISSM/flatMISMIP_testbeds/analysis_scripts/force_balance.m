@@ -2,9 +2,8 @@
 % We find the temporal change in force balance structure
 %% Main script
 geom_type = "deep"; % options: "deep" or "shallow"
-ds = 50; % grid size for the regular grid
+ds = 400; % grid size for the regular grid
 sampled_ti = 1:10:240; % sampled time index
-front_x = 56650; % terminus distance to x = 0
 
 % model parameters and plot parameters
 % read in the model parameter table
@@ -12,7 +11,8 @@ md_vars = readtable('md_var_combinations.csv');
 Ws = sort(unique(md_vars.('fjord_width')));
 GLs = sort(unique(md_vars.('delta_groundingline_depth')));
 FCs = sort(unique(md_vars.('background_friccoef')));
-md_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+expt_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+ctrl_name = 'MISMIP_yangTransient_CalvingOnly.mat';
 % get all model foldernames
 foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
 foldernames_tbl = struct2table(foldernames);
@@ -46,31 +46,79 @@ switch geom_type
 end
 
 % save the force balance field data
-driving_S_all = cell(260, n_simu);
-longi_grad_all = cell(260, n_simu);
-later_grad_all = cell(260, n_simu);
-basal_R_all = cell(260, n_simu);
+driving_S_all = cell(2, 260, n_simu);
+longi_grad_all = cell(2, 260, n_simu);
+later_grad_all = cell(2, 260, n_simu);
+basal_R_all = cell(2, 260, n_simu);
+gl_x_all = cell(2, 260, n_simu);
+front_x_all = cell(2, 260, n_simu);
+Ws_md  = zeros(1,n_simu);
+GLs_md = zeros(1,n_simu);
+FCs_md = zeros(1,n_simu);
+dH_max_expt = zeros(1,n_simu);
+dH_max_ctrl = zeros(1,n_simu);
+dH_sum_expt = zeros(1,n_simu);
+dH_sum_ctrl = zeros(1,n_simu);
+gl_expt = zeros(1,n_simu);
+gl_ctrl = zeros(1,n_simu);
+
+% get both the force balance components and 
 for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
-    md = load([group.folder{j},'/', group.name{j}, '/', md_name]).md;
-    index = md.mesh.elements;
-    %compute nodal functions coefficients N(x,y)=alpha x + beta y +gamma
-    [alpha, beta]=GetNodalFunctionsCoeff(index,md.mesh.x,md.mesh.y);
-    summation=[1;1;1];
-    
-    % get H from vertices to elements
-    % timesteps we look at: first and last
-    %timesteps = [1, size(md.results.TransientSolution,2)];
+    md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
+    md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
+    index = md_expt.mesh.elements;
+    % get the maximum thinning along the centerline
+    % experiment
+    final_icemask = md_expt.results.TransientSolution(end).MaskIceLevelset;
+    final_H = md_expt.results.TransientSolution(end).Thickness; final_H(final_icemask>0) = 0;
+    first_H = md_expt.results.TransientSolution(1).Thickness;   first_H(final_icemask>0) = 0;
+    deltaH = mesh_to_grid(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, first_H-final_H, ds);
+    yi_mid = floor(size(deltaH,1)/2);
+    dH_sum_expt(j) = sum(deltaH(yi_mid,:))*ds;
+    dH_max_expt(j) = max(deltaH(yi_mid,:),[],'all');
+    % control
+    final_icemask = md_ctrl.results.TransientSolution(end).MaskIceLevelset;
+    final_H = md_ctrl.results.TransientSolution(end).Thickness; final_H(final_icemask>0) = 0;
+    first_H = md_ctrl.results.TransientSolution(1).Thickness;   first_H(final_icemask>0) = 0;
+    deltaH = mesh_to_grid(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, first_H-final_H, ds);
+    yi_mid = floor(size(deltaH,1)/2);
+    dH_sum_ctrl(j) = sum(deltaH(yi_mid,:))*ds;
+    dH_max_ctrl(j) = max(deltaH(yi_mid,:),[],'all');
+    % record model info
+    [Ws_md(j), GLs_md(j), FCs_md(j)] = parse_modelname(md_expt.miscellaneous.name);
+
+    % get the maximum grounding line retreat dist
+    % first experiment
+    final_gl = locate_groundingline(md_expt,md_expt.results.TransientSolution(end).MaskOceanLevelset);
+    first_gl = locate_groundingline(md_expt,md_expt.results.TransientSolution(1).MaskOceanLevelset);
+    gl_expt(j) = abs(final_gl - first_gl);
+    % then control
+    final_gl = locate_groundingline(md_ctrl,md_ctrl.results.TransientSolution(end).MaskOceanLevelset);
+    first_gl = locate_groundingline(md_ctrl,md_ctrl.results.TransientSolution(1).MaskOceanLevelset);
+    gl_ctrl(j) = abs(final_gl - first_gl);
+
+    % get force balance components
     for ti = sampled_ti
         smooth_L = 1000;
-        [driving_S, basal_R, longi_grad, later_grad, x, y] = calc_force_balance(md,ti,smooth_L);
+        [driving_S_expt, basal_R_expt, longi_grad_expt, later_grad_expt, x, y, gl_x_expt, front_x_expt] = calc_force_balance(md_expt,ti,smooth_L);
+        [driving_S_ctrl, basal_R_ctrl, longi_grad_ctrl, later_grad_ctrl, ~, ~, gl_x_ctrl, front_x_ctrl] = calc_force_balance(md_ctrl,ti,smooth_L);
         % save
-        % first row: first time step; second row: last time step
-        driving_S_all{ti,j} = driving_S; 
-        longi_grad_all{ti,j} = longi_grad;
-        later_grad_all{ti,j} = later_grad;
-        basal_R_all{ti,j} = basal_R;
+        % experiment
+        driving_S_all{1,ti,j} = driving_S_expt; 
+        longi_grad_all{1,ti,j} = longi_grad_expt;
+        later_grad_all{1,ti,j} = later_grad_expt;
+        basal_R_all{1,ti,j} = basal_R_expt;
+        gl_x_all{1,ti,j} = gl_x_expt;
+        front_x_all{1,ti,j} = front_x_expt;
+        % control
+        driving_S_all{2,ti,j} = driving_S_ctrl; 
+        longi_grad_all{2,ti,j} = longi_grad_ctrl;
+        later_grad_all{2,ti,j} = later_grad_ctrl;
+        basal_R_all{2,ti,j} = basal_R_ctrl;
+        gl_x_all{2,ti,j} = gl_x_ctrl;
+        front_x_all{2,ti,j} = front_x_ctrl;
 
         % plotting code: plot the lateral and longitudinal resistive stress
         % on one figure
@@ -98,46 +146,125 @@ for j = 1:n_simu
     disp(['model ',num2str(j), ' is completed!'])
 end
 
-%% plot evolution of fractional force balance
-figure('Position',[100,100,1200,600]);
-tiledlayout(3,3,'TileSpacing','none')
-for j = 1:n_simu
-    nexttile
-    colororder(cool(length(sampled_ti)))
-    for ti = sampled_ti 
-%     imagesc(fb_ratio{1,i});
-%     clim([0,1])
-        % import grounding line position
-        % extract data along center flow line
-        yi_mid = floor(size(basal_R_all{ti,j},1)/2);
-        basal_R_mid   = basal_R_all{ti,j}(yi_mid,:);
-        driving_S_mid = driving_S_all{ti,j}(yi_mid,:);
-        basal_R_frac = basal_R_mid./driving_S_mid;
-        plot(x/1000, basal_R_frac)
+%% Get total stress balance
+runme_params = readtable('runme_param.csv');
+front_x = runme_params.terminus0_x;
+total_Rs = zeros(2,n_simu);
 
-        ylim([0,1])
-        hold on;
-    end
+for ri = 1:2 % first expt, then control
+    for j = 1:n_simu % simulations
+        ti = sampled_ti(1);
+        % get a referential resistive stress estimate at the first timestep
+        yi_mid = floor(size(basal_R_all{ri,ti,j},1)/2);
+        sample_wid = floor(Ws_md(j)*0.6/ds/2);
+        yi_central = yi_mid-sample_wid:yi_mid+sample_wid;
+        % calculate the resistive stress
+        later_grad_central = later_grad_all{ri,ti,j}(yi_central,:);
+        later_grad_mid = mean(later_grad_central,1);
+        basal_R_central = basal_R_all{ri,ti,j}(yi_mid,:);
+        basal_R_mid = mean(basal_R_central,1);
 
-    % modify the tiled plot appearance
-    if j == 4
-        ylabel('$\tau_b/\tau_d$','Interpreter','latex','FontSize',20)    
-    end
-    if j == 8
-        xlabel('Along flow distance (km)','Interpreter','latex','FontSize',20)
-    end
-    if ismember(j, [2,3,5,6,8,9])
-        set(gca,'ytick',[]);
-    else
-        set(gca,'ytick',[0.5,1])
-    end
-    if ismember(j, [1,2,3,4,5,6])
-        set(gca,'xtick',[]); 
-    end
+        % first: we find the integrated resistive stress
+        % from gl(end time) to the calving front when basal
+        % shear stress is still in place
+        gl_x = gl_x_all{ri,sampled_ti(end),j};
+        front_x = front_x_all{ri,sampled_ti(end),j};
+        sample_xi = find(gl_x < x & x < front_x);
+        % integrate with trapezoid method
+        later_int = trapz(later_grad_mid(sample_xi))*ds;
+        basal_int = trapz(basal_R_mid(sample_xi))*ds;
+        total_R_ref = later_int+basal_int;
 
+        % at the last timestep, get an estimate of loss of total resistive
+        % stress
+        ti = sampled_ti(end);
+        gl_x = gl_x_all{ri,ti,j};
+        front_x = front_x_all{ri,ti,j};
+        sample_xi = find(gl_x < x & x < front_x);
+        later_grad_sample = later_grad_mid(sample_xi);
+        later_int = trapz(later_grad_sample)*ds;
+        total_R_last = later_int;
+
+        % find the difference
+        total_Rs(ri,j) = total_R_ref - total_R_last;
+        clear total_R_ref total_R_last
+
+    end
+               
 end
-exportgraphics(gcf,'plots/taub_taud_frac.png','Resolution',300)
+%exportgraphics(gcf,'plots/taub_taud_frac.png','Resolution',300)
 
+%% Plotting maximum thinning and total resistive stress loss 
+Ws_symb = [40,100,260];
+GLs_symb = ["square","o"];
+FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
+figure('Position',[100,100,1200,1200]);
+tiledlayout(2,2,'TileSpacing','compact')
+nexttile
+for j = 1:n_simu
+    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
+    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
+    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
+    % plot the experiment
+    scatter(dH_max_expt(j),gl_expt(j)/1e3, W_symb,FC_symb,'filled',GL_symb)
+    hold on
+    % plot the control
+    scatter(dH_max_ctrl(j), gl_ctrl(j)/1e3, W_symb,FC_symb,GL_symb);
+    hold on
+end
+xlabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
+ylabel('Grounding line retreat (km)','FontName','Aria','FontSize',14)
+
+nexttile
+for j = 1:n_simu
+    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
+    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
+    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
+    % plot the experiment
+    scatter(dH_sum_expt(j),total_Rs(1,j)/1e6, W_symb,FC_symb,'filled',GL_symb)
+    hold on
+    % plot the control
+    scatter(dH_sum_ctrl(j), total_Rs(2,j)/1e6, W_symb,FC_symb,GL_symb);
+    hold on
+end
+xlabel('Total thinning (m^2)','FontName','Aria','FontSize',14)
+ylabel('Total resistive stress loss (MPa)','FontName','Aria','FontSize',14)
+
+nexttile
+for j = 1:n_simu
+    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
+    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
+    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
+    % plot the experiment
+    scatter(dH_max_expt(j),total_Rs(1,j)/1e6, W_symb,FC_symb,'filled',GL_symb)
+    hold on
+    % plot the control
+    scatter(dH_max_ctrl(j), total_Rs(2,j)/1e6, W_symb,FC_symb,GL_symb);
+    hold on
+end
+xlabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
+ylabel('Total resistive stress loss (MPa)','FontName','Aria','FontSize',14)
+
+nexttile
+for j = 1:n_simu
+    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
+    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
+    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
+    % plot the experiment
+    scatter(dH_sum_expt(j),gl_expt(j)/1e3, W_symb,FC_symb,'filled',GL_symb)
+    hold on
+    % plot the control
+    scatter(dH_sum_ctrl(j), gl_ctrl(j)/1e3, W_symb,FC_symb,GL_symb);
+    hold on
+end
+xlabel('Total thinning (m^2)','FontName','Aria','FontSize',14)
+ylabel('Grounding line retreat (km)','FontName','Aria','FontSize',14)
+
+% ylabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
+% xlabel('Testbed linear index','FontName','Aria','FontSize',14)
+% ylabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
+% xlabel('Testbed linear index','FontName','Aria','FontSize',14)
+exportgraphics(gcf,'plots/two_thinning_proxies.png','Resolution',600)
 %% plot evolution of the absolute force component
 figure('Position',[100,100,1200,600]);
 tiledlayout(3,3,'TileSpacing','none')

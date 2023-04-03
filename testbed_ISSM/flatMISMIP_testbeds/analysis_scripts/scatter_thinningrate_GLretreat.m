@@ -51,7 +51,7 @@ for q = 1:length(GLs) % shallow, deep
         modelname = md_ctrl.miscellaneous.name;
 
         % Get thickness data
-        [Ws(q,j), GLs(q,j), FCs(q,j)] = parse_modelname(modelname);
+        [Ws_md(q,j), GLs_md(q,j), FCs_md(q,j)] = parse_modelname(modelname);
         expt_H = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
         ctrl_H = [results_tbl_ctrl.Surface{:}];
         expt_H_cell = num2cell(expt_H,1); 
