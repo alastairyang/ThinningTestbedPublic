@@ -12,6 +12,24 @@ front_xy_interp = [front_x_interp, transpose(y(y_crop))];
 [X_crop, Y_crop] = meshgrid(x(x_crop),y(y_crop));
 dist_to_front = abs(front_x_interp - X_crop);
 
+%% SNR
+    % we use uniform distribution between low and high threshold
+    noise_lowamp  = 0; % lower bar 0 m uncertainty
+    noise_highamp = 0.5; % higher bar 0.5 m uncertainty
+    n_samples = 500; % 200 random sampling of noise amplitude
+    amp_rand = (noise_highamp - noise_lowamp).*rand(n_samples,size(expt_S_grid_v,2)) + noise_lowamp;
+    noise = transpose(sqrt(amp_rand)/3.*transpose(randn(size(md_grid_v,2),n_samples)));
+    snr_ht = zeros(size(md_grid_v,1),n_samples);
+    for ni = 1:n_samples
+        for k = 1:size(md_grid_v,1)
+            if sum(isnan(md_grid_v(k,:)))>0 % skip nan
+                snr_ht(k,ni) = nan;
+            else
+                snr_ht(k,ni) = snr(md_grid_v(k,:), noise(:,ni));
+            end
+        end
+    end
+
 
 %% Seasonal calving step in runme
         if perform(org, 'Transient_SeasonalCalving_MassUnloading')% {{{1 STEP 8

@@ -4,10 +4,9 @@
 %% Parameters
 % (thickness change attributed to the effective pressure dependence)
 gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
-gcp_ds = 2000; % sampling spacing for ground control points
 ds = 50; % regular meshgrid spacing
 geom_type = 'shallow'; % types: "deep", "shallow"
-expt_type = "mu"; % types: "mu", "mu_plastic"
+expt_type = 'mu'; % types: "mu", "mu_plastic"
 retreat_stop_yr = 16; 
 
 %% Plot only the difference between the control and experiment 
@@ -68,6 +67,8 @@ end
 
 
 n_simu = size(folder_dir_groups{geom_i}, 1);
+ff = figure('Position',[100,100,900,1200]);
+tiledlayout(3,3,'TileSpacing','none')
 for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
@@ -75,65 +76,102 @@ for j = 1:n_simu
     md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
     results_tbl_expt = struct2table(md_expt.results.TransientSolution);
     results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
-    % get model information
+    % Get thickness data
     modelname = md_ctrl.miscellaneous.name;
     [W, GL, FC] = parse_modelname(modelname);
-    % isolate the delta H from localized basal perturbation
-    expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Surface{:}]', results_tbl_ctrl.time,'linear','extrap'));
-    deltaH = expt_H_interp - [results_tbl_ctrl.Surface{:}];
-    deltaH_cell = num2cell(deltaH,1);
-    [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, ds);
+    %expt_H = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
+    expt_H = [results_tbl_expt.Surface{:}];
+    ctrl_H = [results_tbl_ctrl.Surface{:}];
+    expt_H_cell = num2cell(expt_H,1); 
+    ctrl_H_cell = num2cell(ctrl_H,1);
+    [expt_H_grid, ~, ~] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, expt_H_cell, ds);
+    [ctrl_H_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, ctrl_H_cell, ds);
     % mask out non-ice part
     [ctrl_mask_grid, ~, ~] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, results_tbl_ctrl.MaskIceLevelset, ds);
-    md_grid(ctrl_mask_grid>0) = nan;
-    md_grid = permute(md_grid,[2,3,1]);
+    [expt_mask_grid, ~, ~] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, results_tbl_expt.MaskIceLevelset, ds);
+    expt_H_grid(expt_mask_grid>0) = nan;
+    ctrl_H_grid(ctrl_mask_grid>0) = nan;
+    expt_H_grid = permute(expt_H_grid,[2,3,1]);
+    ctrl_H_grid = permute(ctrl_H_grid,[2,3,1]);
+    % Thickness difference wrt the initial thickness
+    expt_H_grid = expt_H_grid - expt_H_grid(:,:,1);
+    ctrl_H_grid = ctrl_H_grid - ctrl_H_grid(:,:,1);
 
-    % add the grounding line and signal
-    % retrieve grounding line position over time
+    % add the grounding line and front 
     t_expt = results_tbl_expt.time;
     t_ctrl = results_tbl_ctrl.time;
     gls_expt = zeros(size(t_expt));
+    cfs_expt = zeros(size(t_expt));
     gls_ctrl = zeros(size(t_ctrl));
+    cfs = zeros(size(t_ctrl));
     for i = 1:260
+        % grounding line
         gls_expt(i) = locate_groundingline(md_expt, md_expt.results.TransientSolution(i).MaskOceanLevelset);
         gls_ctrl(i) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset);
+        % calving front
+        cfs(i) = locate_calvingfront(md_ctrl, md_ctrl.results.TransientSolution(i).MaskIceLevelset);
     end
-    % if there is zero (usually the last point), we use the previous GL
+    % if there is zero (usually the last point), we use the previous
     % value
     zero_idx = find(gls_expt == 0); gls_expt(zero_idx) = gls_expt(zero_idx-1);
     zero_idx = find(gls_ctrl == 0); gls_ctrl(zero_idx) = gls_ctrl(zero_idx-1);
+    zero_idx = find(cfs == 0); cfs(zero_idx) = cfs(zero_idx-1);
     % interpolate
-    gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
-    gls_diff = gls_expt_interp - gls_ctrl;
 
     % crop the initial 5 years no-perturbation period, and some extra
     % padding beyond the calving front
     start_t = 5; dt = 0.1; end_t = 26;
-    md_grid = md_grid(:,:,start_t/dt+1:end);
-    md_grid = md_grid(:,x<=runme_params.terminus0_x,:);
-    mid_y = floor(size(md_grid,1)/2);
-    md_grid_mids = squeeze(md_grid(mid_y,:,:));
-    % also crop the grounding line position vector
-    gls_expt_c = gls_expt_interp(start_t/dt+1:end);
+    expt_H_grid = expt_H_grid(:,:,start_t/dt+1:end);
+    ctrl_H_grid = ctrl_H_grid(:,:,start_t/dt+1:end);
+    expt_H_grid = expt_H_grid(:,x<=runme_params.terminus0_x,:);
+    ctrl_H_grid = ctrl_H_grid(:,x<=runme_params.terminus0_x,:);
+    mid_y = floor(size(expt_H_grid,1)/2);
+    % center flowline stacked overtime
+    expt_H_grid_mids = squeeze(expt_H_grid(mid_y,:,:));
+    ctrl_H_grid_mids = squeeze(ctrl_H_grid(mid_y,:,:));
+    % also crop the grounding line and calving front position vector
+    gls_expt_c = gls_expt(start_t/dt+1:end);
     gls_ctrl_c = gls_ctrl(start_t/dt+1:end);
+    cfs_c = cfs(start_t/dt+1:end);
+    % make time vector
+    plot_t_expt = 0:0.1:size(expt_H_grid_mids, 2)/10-0.1;
+    plot_t_ctrl = 0:0.1:size(ctrl_H_grid_mids, 2)/10-0.1;
+    % interpolate linearly to same time vector, wrt the expt
+    ctrl_H_grid_mids = transpose(interp1(plot_t_ctrl, ctrl_H_grid_mids', plot_t_expt));
+    gls_ctrl_c = interp1(plot_t_ctrl, gls_ctrl_c, plot_t_expt);
 
-
-    ff = figure('Position',[100,100,700,600]);
-    plot_t = 0:0.1:size(md_grid_mids, 2)/10-0.1;
     plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
-    imagesc(plot_t, plot_x, md_grid_mids, 'AlphaData',~isnan(md_grid_mids));
-    colormap(davos);
-    clim([-250,0]);
-    hold on
-    plot(plot_t,gls_ctrl_c/1000,'r-.','LineWidth',2.5); hold on;
-    plot(plot_t,gls_expt_c/1000,'b-.','LineWidth',2.5); hold on;
-    plot(retreat_stop_yr, plot_x/1000, 'k-.','LineWidth',2); hold off
-    legend(["Control GL", "Experiment GL","End of front retreat"])
 
-    plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
-    exportgraphics(gcf, ['plots/',save_foldername,'/',plot_name,'.png'],'BackgroundColor','none','Resolution',300)
+    % make the tiled plots
+    nexttile
+    % plot control
+    contourf(plot_t_expt, fliplr(plot_x), expt_H_grid_mids-ctrl_H_grid_mids, 8); % fliplr(plot_x) can be interpret as -> distance to ice front
+    colormap(davos); clim([-250,0]); hold on;
+    plot(plot_t_expt,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
+    plot(plot_t_expt,(runme_params.terminus0_x - gls_expt_c)/1000,'b-','LineWidth',2.5); hold on;    
+    xline(retreat_stop_yr,'k:','LineWidth',2); hold on
+    % add calving front trace
+    plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
+    
+    if j == 1
+        legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
+    end
+    if ~ismember(j,[1,4,7])
+        set(gca,'YTick',[]);
+    end
+    if ~ismember(j,[7,8,9])
+        set(gca,'XTick',[])
+    else
+        set(gca,'XTick',[0,4,8,12,16,20])
+    end
+
+    %plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
 
 end
+cb = colorbar;
+cb.Layout.Tile = 'east';
+exportgraphics(gcf, ['plots/',save_foldername,'/',expt_type,'_',geom_type,'_diff.png'],'Resolution',600)
+
 
 %% Plot full simulations: H(t) from the control and experiment side-by-side
 % model parameters and plot parameters
@@ -159,7 +197,7 @@ for i = 1:length(GLs)
     % skip the irrelevant ones
     GL_bool = zeros(size(foldernames_tbl,1),1);
     for j = 1:size(foldernames_tbl.name)
-        GL_bool(j) = compare_GLvalue(foldernames_tbl.name(j), GLs(i));
+        GL_bool(j) = comparee_GLvalue(foldernames_tbl.name(j), GLs(i));
     end
     % save the respective folder items to a cell
     folder_dir_groups{i} = foldernames_tbl(find(GL_bool),:); %#ok<FNDSB> 
@@ -266,7 +304,7 @@ for j = 1:n_simu
     tiledlayout(1,2,'TileSpacing','none')
     nexttile
     % plot control
-    contourf(plot_t_ctrl, fliplr(plot_x), ctrl_H_grid_mids); % fliplr(plot_x) can be interpret as -> distance to ice front
+    contourf(plot_t_ctrl, fliplr(plot_x), ctrl_H_grid_mids, 8); % fliplr(plot_x) can be interpret as -> distance to ice front
     colormap(davos); clim([-250,0]); hold on;
     plot(plot_t_ctrl,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
@@ -275,7 +313,7 @@ for j = 1:n_simu
     
     % plot experiment
     nexttile
-    contourf(plot_t_expt, fliplr(plot_x), expt_H_grid_mids);
+    contourf(plot_t_expt, fliplr(plot_x), expt_H_grid_mids, 8);
     colormap(davos); clim([-250,0]); hold on;
     set(gca,'ytick',[])
     colorbar

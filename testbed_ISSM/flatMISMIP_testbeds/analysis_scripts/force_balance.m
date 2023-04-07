@@ -101,7 +101,7 @@ for j = 1:n_simu
 
     % get force balance components
     for ti = sampled_ti
-        smooth_L = 1000;
+        smooth_L = 2000;
         [driving_S_expt, basal_R_expt, longi_grad_expt, later_grad_expt, x, y, gl_x_expt, front_x_expt] = calc_force_balance(md_expt,ti,smooth_L);
         [driving_S_ctrl, basal_R_ctrl, longi_grad_ctrl, later_grad_ctrl, ~, ~, gl_x_ctrl, front_x_ctrl] = calc_force_balance(md_ctrl,ti,smooth_L);
         % save
@@ -120,28 +120,6 @@ for j = 1:n_simu
         gl_x_all{2,ti,j} = gl_x_ctrl;
         front_x_all{2,ti,j} = front_x_ctrl;
 
-        % plotting code: plot the lateral and longitudinal resistive stress
-        % on one figure
-%         figure('Position',[100,100,1400,300]); 
-%         strs_bnd = 1e5;
-%         subplot(1,2,1);imagesc(xq,yq,longi_grad);clim([-strs_bdn, strs_bnd]);
-%         subplot(1,2,2);imagesc(xq,yq,later_grad);clim([-strs_bnd, strs_bnd])
-%         colorbar
-
-%         % plotting code: plot the change in the lateral resistive stress 
-%         figure('Position',[100,100,600,200]); imagesc(x,y,later_grad_all{2,j}-later_grad_all{1,j}); clim([-8e4,8e4]); colorbar
-
-        % plot the fraction of basal to driving
-        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,basal_R_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,basal_R_all{2,j}./driving_S_all{2,j});clim([0,1])
-        % plot the fraction of longi_grad to driving
-        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,longi_grad_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,longi_grad_all{2,j}./driving_S_all{2,j});clim([0,1])
-        % plot the fraction of later_grad to driving
-        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,later_grad_all{1,j}./driving_S_all{1,j}); clim([0,1]); subplot(2,1,2);imagesc(x,y,later_grad_all{2,j}./driving_S_all{2,j});clim([0,1])
-
-        % plot to validate that the force is in balance; use the first
-        % timestep
-        %figure('Position',[100,100,600,400]); subplot(2,1,1);imagesc(x,y,driving_S_all{1,j});clim([0,3e5]);subplot(2,1,2);imagesc(x,y,basal_R_all{1,j}+later_grad_all{1,j}+longi_grad_all{1,j}); clim([0,3e5])
-        
     end
     disp(['model ',num2str(j), ' is completed!'])
 end
@@ -167,7 +145,8 @@ for ri = 1:2 % first expt, then control
         % first: we find the integrated resistive stress
         % from gl(end time) to the calving front when basal
         % shear stress is still in place
-        gl_x = gl_x_all{ri,sampled_ti(end),j};
+        %gl_x = gl_x_all{ri,sampled_ti(end),j};
+        gl_x = 0;
         front_x = front_x_all{ri,sampled_ti(end),j};
         sample_xi = find(gl_x < x & x < front_x);
         % integrate with trapezoid method
@@ -178,7 +157,8 @@ for ri = 1:2 % first expt, then control
         % at the last timestep, get an estimate of loss of total resistive
         % stress
         ti = sampled_ti(end);
-        gl_x = gl_x_all{ri,ti,j};
+        %gl_x = gl_x_all{ri,ti,j};
+        gl_x = 0;
         front_x = front_x_all{ri,ti,j};
         sample_xi = find(gl_x < x & x < front_x);
         later_grad_sample = later_grad_mid(sample_xi);
@@ -198,73 +178,79 @@ end
 Ws_symb = [40,100,260];
 GLs_symb = ["square","o"];
 FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
-figure('Position',[100,100,1200,1200]);
-tiledlayout(2,2,'TileSpacing','compact')
-nexttile
+figure('Position',[100,100,1100,600]);
+tiledlayout(1,3,'TileSpacing','compact')
+
+nexttile % total thinning vs GL retreat
 for j = 1:n_simu
     W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
     GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
     FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
     % plot the experiment
-    scatter(dH_max_expt(j),gl_expt(j)/1e3, W_symb,FC_symb,'filled',GL_symb)
+    scatter(gl_expt(j)/1e3, dH_sum_expt(j),W_symb,FC_symb,'filled',GL_symb)
     hold on
     % plot the control
-    scatter(dH_max_ctrl(j), gl_ctrl(j)/1e3, W_symb,FC_symb,GL_symb);
+    scatter(gl_ctrl(j)/1e3, dH_sum_ctrl(j), W_symb,FC_symb,GL_symb);
     hold on
 end
-xlabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
-ylabel('Grounding line retreat (km)','FontName','Aria','FontSize',14)
+ylabel('Total thinning (m^2)')
+xlabel('Grounding line retreat (km)')
+ax = gca;
+ax.FontSize = 14;
+ax.FontName = 'Aria';
 
-nexttile
+nexttile % Max thinning vs GL retreat
 for j = 1:n_simu
     W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
     GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
     FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
     % plot the experiment
-    scatter(dH_sum_expt(j),total_Rs(1,j)/1e6, W_symb,FC_symb,'filled',GL_symb)
+    scatter(gl_expt(j)/1e3, dH_max_expt(j), W_symb,FC_symb,'filled',GL_symb)
     hold on
     % plot the control
-    scatter(dH_sum_ctrl(j), total_Rs(2,j)/1e6, W_symb,FC_symb,GL_symb);
+    scatter(gl_ctrl(j)/1e3, dH_max_ctrl(j), W_symb,FC_symb,GL_symb);
     hold on
 end
-xlabel('Total thinning (m^2)','FontName','Aria','FontSize',14)
-ylabel('Total resistive stress loss (MPa)','FontName','Aria','FontSize',14)
+ylabel('Maximum thinning (m)')
+xlabel('Grounding line retreat (km)')
+set(gca,'XTick',[2,6,10,14]);
+ax = gca; ax.FontSize = 14; ax.FontName = 'Aria';
 
-nexttile
+% nexttile
+% for j = 1:n_simu
+%     W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
+%     GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
+%     FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
+%     % plot the experiment
+%     scatter(dH_sum_expt(j),total_Rs(1,j)/1e6, W_symb,FC_symb,'filled',GL_symb)
+%     hold on
+%     % plot the control
+%     scatter(dH_sum_ctrl(j), total_Rs(2,j)/1e6, W_symb,FC_symb,GL_symb);
+%     hold on
+% end
+% xlabel('Total thinning (m^2)','FontName','Aria','FontSize',14)
+% ylabel('Total resistive stress loss (MPa)','FontName','Aria','FontSize',14)
+
+nexttile % Total stress loss vs max thinning
 for j = 1:n_simu
     W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
     GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
     FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
     % plot the experiment
-    scatter(dH_max_expt(j),total_Rs(1,j)/1e6, W_symb,FC_symb,'filled',GL_symb)
+    scatter(total_Rs(1,j)/1e9, dH_max_expt(j), W_symb,FC_symb,'filled',GL_symb)
     hold on
     % plot the control
-    scatter(dH_max_ctrl(j), total_Rs(2,j)/1e6, W_symb,FC_symb,GL_symb);
+    scatter(total_Rs(2,j)/1e9, dH_max_ctrl(j), W_symb,FC_symb,GL_symb);
     hold on
 end
-xlabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
-ylabel('Total resistive stress loss (MPa)','FontName','Aria','FontSize',14)
+xlim([0,100])
+ylabel('Maximum thinning (m)','FontName','Aria','FontSize',14)
+xlabel('Total resistive stress loss (GPa)','FontName','Aria','FontSize',14)
+ax = gca; ax.FontSize = 14; ax.FontName = 'Aria';
 
-nexttile
-for j = 1:n_simu
-    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
-    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
-    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
-    % plot the experiment
-    scatter(dH_sum_expt(j),gl_expt(j)/1e3, W_symb,FC_symb,'filled',GL_symb)
-    hold on
-    % plot the control
-    scatter(dH_sum_ctrl(j), gl_ctrl(j)/1e3, W_symb,FC_symb,GL_symb);
-    hold on
-end
-xlabel('Total thinning (m^2)','FontName','Aria','FontSize',14)
-ylabel('Grounding line retreat (km)','FontName','Aria','FontSize',14)
-
-% ylabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
-% xlabel('Testbed linear index','FontName','Aria','FontSize',14)
-% ylabel('Maximum thinning (meter)','FontName','Aria','FontSize',14)
-% xlabel('Testbed linear index','FontName','Aria','FontSize',14)
 exportgraphics(gcf,'plots/two_thinning_proxies.png','Resolution',600)
+
+
 %% plot evolution of the absolute force component
 figure('Position',[100,100,1200,600]);
 tiledlayout(3,3,'TileSpacing','none')
