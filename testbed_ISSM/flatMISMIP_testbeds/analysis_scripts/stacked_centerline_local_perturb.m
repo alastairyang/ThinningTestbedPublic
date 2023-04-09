@@ -1,8 +1,8 @@
 %% Plot h(t) of center flowline from localized basal perturbation
 %% The whole center line tabulated along the time axis
 ds = 50; % regular meshgrid spacing
-pulse_type = 'Pulse'; % types: "Diffu","Pulse"
-geom_type = 'deep'; % types: "deep", "shallow"
+pulse_type = 'Diffu'; % types: "Diffu","Pulse"
+geom_type = 'shallow'; % types: "deep", "shallow"
 expt_type = 'mu'; % types: "no_mu", "mu" (without mass-unloading; with mass unloading)
 
 % model parameters and plot parameters
@@ -163,13 +163,13 @@ for j = 1:n_simu
 
 end
 
-% create color bars for the figures, and save as vector files
+%% create color bars for the figures, and save as vector files
 figure;
-imagesc(rand(10,10)); clim([0,10]);colormap(diverg_colormap(50)); colorbar
+imagesc(rand(10,10)); clim([-10,10]);colormap(diverg_colormap(50)); colorbar
 exportgraphics(gcf,'plots/colorbar_0_10.pdf','ContentType','vector')
 
 figure;
-imagesc(rand(10,10));clim([0,5]);colormap(diverg_colormap(50)); colorbar
+imagesc(rand(10,10));clim([-5,5]);colormap(diverg_colormap(50)); colorbar
 exportgraphics(gcf,'plots/colorbar_0_5.pdf','ContentType','vector')
 
 

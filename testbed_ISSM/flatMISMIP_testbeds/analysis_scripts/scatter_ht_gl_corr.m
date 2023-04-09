@@ -4,7 +4,7 @@
 %% Main script
 % parameters
 %md_type = 'expt'; % options: "expt", "ctrl"
-ds = 500; % meshgrid spacing
+ds = 100; % meshgrid spacing
 
 % input
 md_vars = readtable('md_var_combinations.csv');
@@ -82,8 +82,8 @@ for tp = 1:length(md_types)
             front_corr = zeros(md.mesh.numberofvertices, 1);
             dt = 0.1;
             % frontal retreat rate and grounding line retreat rate
-            gl_rate = transpose(smooth(diff(ht_data.gl,1)/dt,80));
-            front_rate = transpose(smooth(diff(ht_data.front,1)/dt,10));
+            gl_rate = transpose(smooth(diff(ht_data.gl,1)/dt,30));
+            front_rate = transpose(smooth(diff(ht_data.front,1)/dt,30));
             for k = 1:md.mesh.numberofvertices
                 %dhdt = smooth(diff(h_mat(:,k),1)/dt,10);
                 ht = h_mat(:,k);
