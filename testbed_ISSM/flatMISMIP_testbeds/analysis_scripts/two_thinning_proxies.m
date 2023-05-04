@@ -245,7 +245,7 @@ for j = 1:n_simu
 end
 xlim([0,100])
 ylabel('Maximum thinning (m)','FontName','Aria','FontSize',14)
-xlabel('Total resistive stress loss (GPa)','FontName','Aria','FontSize',14)
+xlabel('Total resistive stress loss (GPa m)','FontName','Aria','FontSize',14)
 ax = gca; ax.FontSize = 14; ax.FontName = 'Aria';
 
 exportgraphics(gcf,'plots/two_thinning_proxies.png','Resolution',600)
