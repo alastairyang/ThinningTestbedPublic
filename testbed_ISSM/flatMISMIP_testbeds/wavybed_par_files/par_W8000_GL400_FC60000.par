@@ -61,7 +61,7 @@ wc =  wc_const*funnel_factor; % apply funnel factor
 by = dc ./ (1 + exp(-2/fc .* (md.mesh.y-Ly/2-wc))) + dc ./ (1 + exp(2/fc .* (md.mesh.y-Ly/2+wc)));
 
 % add fractal bed; roughness gradually tapers off from center line to side wall using scaling
-load('random_beds/dD120_H09_RO6000.mat') % load a structure 'rand_bed'
+load('random_beds/dD80_H07_RO4000_3.mat') % load a structure 'rand_bed'
 by_trunk = dc ./ (1 + exp(-2/fc .* (md.mesh.y-Ly/2-wc))) + dc ./ (1 + exp(2/fc .* (md.mesh.y-Ly/2+wc)));
 scaling = (max(by_trunk) - by_trunk)/max(by_trunk);
 % interpolate onto the model mesh

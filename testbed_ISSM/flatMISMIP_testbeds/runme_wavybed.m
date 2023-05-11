@@ -1,6 +1,6 @@
 %%%%%%%%%%%%%% DON'T CHANGE THE FOLLOWING LINES / DON'T MODIFY LINE NO. %%%%%%%%%%%%%%
 % specify model index; specify 
-md_idx = [6,18];
+md_idx = [4,16];  % 4 and 16 (narrow low fric, narrow high fric)
 tbl_filename = "runtime_table_all.csv";
 gauss_mag = 0.8; % fractional reduction in basal shear stress, (1-gauss_mag)*tau_b
 %%%%%%%%%%%%%% 
