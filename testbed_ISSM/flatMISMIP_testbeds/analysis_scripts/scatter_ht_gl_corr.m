@@ -124,26 +124,7 @@ for tp = 1:length(md_types)
             % save to cells
             gl_corrs{tp,q,j} = gl_corr_mid;
             front_corrs{tp,q,j} = front_corr_mid;
-    
-    %         % estimate the decay length scale 
-    %         options = optimset('Display','notify','PlotFcns',@optimplotfval);
-    %         decay_v = [5]; % decay length scale initial guess
-    %         % we only use the positive data points for decay length scale
-    %         % estimation
-    %         gl_corr_mid_c = gl_corr_mid(gl_corr_mid > 0);
-    %         front_corr_mid_c = front_corr_mid(front_corr_mid > 0);
-    %         % new x axis
-    %         gl_xx = dist_to_front{q,j}(gl_corr_mid > 0)/1000;
-    %         front_xx = dist_to_front{q,j}(front_corr_mid > 0)/1000;
-    %         gl_decay_length(q,j)    = fminsearch(@minimize_attenuation, [decay_v,max(gl_corr_mid)], options, gl_xx, gl_corr_mid_c);
-    %         front_decay_length(q,j) = fminsearch(@minimize_attenuation, [decay_v,max(front_corr_mid)], options, front_xx, front_corr_mid_c);
-    %         % make a plot
-    %         plot_attenuation(decay_length, max(gl_corr_mid), dist_to_perturb, peaks_downstream)
-    %         % calculate mean correlation coef (10 km near the front)
-    %         front_idx = find(dist_to_front{q,j}<10000);
-    %         gl_corrcoef_mean(q,j) = mean(gl_corrs{q,j}(front_idx));
-    %         front_corrcoef_mean(q,j) = mean(front_corrs{q,j}(front_idx));
-        
+   
             disp(['Model ', modelname(9:end),' is processed.'])
         end
     end

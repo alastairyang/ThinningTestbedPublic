@@ -1,6 +1,6 @@
 %%%%%%%%%%%%%% DON'T CHANGE THE FOLLOWING LINES / DON'T MODIFY LINE NO. %%%%%%%%%%%%%%
 % specify model index; specify 
-md_idx = [4,16];  % 4 and 16 (narrow low fric, narrow high fric)
+md_idx = [16];  % 16 is narrow fjord with high fric)
 tbl_filename = "runtime_table_all.csv";
 gauss_mag = 0.8; % fractional reduction in basal shear stress, (1-gauss_mag)*tau_b
 %%%%%%%%%%%%%% 
@@ -13,7 +13,7 @@ terminus0_x = 56500; % initialized terminus closed to the front
 retreat_rate_max = 1000; % maximum retreat rate (m/a)
 seasonal_retreat_rate_max = 120; % maximum retreat rate for seasonal calving experiment (m/a)
 calve_seasonal_max = 50; % seasonal variation 
-gauss_xloc = 3.2e4; % x-axis location of the gaussian perturbation (m)
+gauss_xloc = 34750; % x-axis location of the gaussian perturbation (m)
 %gauss_tscale = 2; % flucation time scale. One full cyle is 2*2 years.
 gauss_width_ratio = 0.08; % the ratio of gaussian perturbation patch to fjord width
 gauss_timestep = 0.01; % temporal resolution of the prescribed gaussian path (yr)
@@ -78,7 +78,7 @@ for jj = md_idx
     end
 
     % step iteration
-    for steps = 1:5
+    for steps = 6
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -412,7 +412,7 @@ for jj = md_idx
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
 
-        if perform(org, 'Transient_SeasonalCalving_MassUnloading')% {{{1 STEP 8
+        if perform(org, pulse_gauss_mu_title)% {{{1 STEP 6: Basal perturbation: pulse gaussian patch + mass unloading
             md = loadmodel(org, 'Transient_ExtraInfo');
 
             % parameter regarding time
@@ -422,7 +422,7 @@ for jj = md_idx
             md.timestepping = timestepping(); 
             md.timestepping.start_time = start_time;
             dt_mu = 0.1; % mass unloading update dt
-            dt_calve = 0.1; % calving front position update dt
+            dt_calve = 1; % calving front position update dt
 
             % simulation config
             np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
@@ -433,17 +433,15 @@ for jj = md_idx
             % do not interpolate forcing
             md.timestepping.interp_forcing = 0;
 
-            % Calving
+            %% Calving
             % forcings
-            retreat_advance = linspace(0,seasonal_retreat_rate_max, perturb_duration/2*(1/dt_calve));
+            retreat_advance = linspace(100,retreat_rate_max, perturb_duration/2);
             retreat_slow = flip(retreat_advance);
-            retreat_no = zeros(1,no_retreat_duration*(1/dt_calve));
-            retreat_perturb = [retreat_advance, retreat_slow];
-            retreat_seasonal = calve_seasonal_max*sqrt(retreat_perturb).*sin(2*pi*[0:0.1:perturb_duration-0.1]);
-            retreat_sequence = [retreat_no, retreat_perturb + retreat_seasonal, retreat_no];
+            retreat_no = zeros(1,no_retreat_duration);
+            retreat_sequence = [retreat_no, retreat_advance, retreat_slow, retreat_no];
             md.frontalforcings.meltingrate = zeros(md.mesh.numberofvertices, 1);
 
-            % enabling movingfront (levelset method), even if we are
+            % Enabling movingfront (levelset method), as we are
             % prescribing the terminus
             md.transient.ismovingfront = 1;
             md.calving.calvingrate = zeros(md.mesh.numberofvertices, 1);
@@ -458,8 +456,8 @@ for jj = md_idx
             calving_end   = end_time;
             
             % prescribing calving front: change annually
-            for time_i = 1:length(retreat_sequence) % only the few years in the middle
-                magnitude = retreat_sequence(time_i);
+            for time = calving_start : dt_calve: calving_end % only the few years in the middle
+                magnitude = retreat_sequence(time);
                 culmu_magnitude = culmu_magnitude + magnitude;
                 signeddistance = move_terminus_levelset_mod(md, levelset0, culmu_magnitude, -1, true);
 
@@ -472,10 +470,73 @@ for jj = md_idx
                 delete('TEMP.exp');
                 signeddistance(pos) = -signeddistance(pos);
 
-                md.levelset.spclevelset(:,end+1) = [signeddistance; md.timestepping.start_time + time_i*dt_calve];
+                md.levelset.spclevelset(:,end+1) = [signeddistance; md.timestepping.start_time + time];
             end
             
-            % Mass unloading
+            %% Basal perturbation with a Gaussian patch
+            % add an initial time column to the friction coef vector
+            C0 = md.friction.C;
+            init_taub = C0.^2.*md.results.TransientSolution(end).Vel./md.constants.yts;
+            % create the temporal fluctuation sequence, delta_tau
+            start_t = md.levelset.spclevelset(end,1);
+            perturb_t = 0:gauss_timestep:perturb_duration-gauss_timestep;
+            no_perturb_t = 0:gauss_timestep:no_retreat_duration-gauss_timestep;
+
+            % get pulse gaussian
+            pulse_gauss = gauss_mag*make_pulse_gauss(pulse_gauss_tscale, gauss_efold, gauss_perturb_repeat_tscale, gauss_timestep, pulse_gauss_tshift);
+            % stack them to make a full sequence
+            total_cycle = perturb_duration/gauss_perturb_repeat_tscale;
+            gauss_mags = repmat(pulse_gauss, 1, total_cycle);
+            % add the no perturb period
+            gauss_mags = [zeros(size(no_perturb_t)), gauss_mags, zeros(size(no_perturb_t))];
+            % actual time axis
+            gauss_t = 0:gauss_timestep:(perturb_duration+2*no_retreat_duration-gauss_timestep);
+            gauss_t = gauss_t + (start_t + gauss_timestep);
+            % interp from mesh to grid and smooth
+            Lx = max(md.mesh.x);
+            Ly = max(md.mesh.y);
+            x = 0:ds:Lx;
+            y = 0:ds:Ly;
+            [X,Y] = meshgrid(x, y);
+            % find centerline index
+            if rem(size(X,1), 2) == 0
+                mid_i = size(X,1)/2;
+            else
+                mid_i = (size(X,1)+1)/2;
+            end
+            init_taub_grid = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
+                            init_taub,x, y, NaN);
+            % smooth the initial basal shear stress field
+            for row = 1:size(init_taub_grid,1)
+                init_taub_grid(row,:) = smooth(init_taub_grid(row,:),20);
+            end
+            % location of the the perturbation
+            x0 = gauss_xloc;
+            y0_i = mid_i;
+            x0_i = floor(x0/ds);
+            y0 = ds*mid_i;
+            % Friction coefficient fields for all time steps
+            % save to a matrix
+            delta_C_all = zeros(length(C0), length(gauss_t));
+            for iter = 1:length(gauss_t)
+                amp = gauss_mags(iter)*init_taub_grid(y0_i,x0_i);
+                % scale with respect to the max width in our testbeds
+                max_width = max(mdvar_combs.fjord_width);
+                width_ratio = var_table.('fjord_width')/max_width;
+                width = gauss_width_ratio*max_width*sqrt(width_ratio);
+                delta_taub = transient_slippatch(X,Y,x0,y0,width,amp);
+                % convert back to changes in fric coefficient
+                delta_taub = InterpFromGridToMesh(x',y',delta_taub,md.mesh.x,md.mesh.y,0);
+                delta_C = sqrt(delta_taub./(md.results.TransientSolution(end).Vel/md.constants.yts));
+                delta_C(isinf(delta_C)) = 0;
+                delta_C(isnan(delta_C)) = 0;
+                delta_C_all(:,iter) = delta_C; % delta_C: reduction is positive
+                % this delta_C_all is then modified below 
+                % when we calculate the effective pressure change
+                % and then assimilate into md.friction.C
+            end
+
+            %% Mass unloading
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
@@ -483,9 +544,8 @@ for jj = md_idx
             next_start_time = md_temp.timestepping.start_time;
             clear md_temp
             
-            % initialize
+            % initialize a var to collect results
             new_results = [];
-
             % mass unloading activation time
             % we only allow this effective pressure feedback (mass
             % unloading) to be active after the terminus retreat has
@@ -493,26 +553,28 @@ for jj = md_idx
             mu_time_mask = zeros(size(retreat_sequence));
             mu_time_mask(find(retreat_sequence > 0, 1,'first'):end) = 1;
             % interp
-            mu_time_mask_interp = interp1(1:end_time, mu_time_mask, 0:dt_mu:end_time-dt_mu, 'previous',0); 
-
+            mu_time_mask_interp = interp1(1:end_time, mu_time_mask, 0:gauss_timestep:end_time-gauss_timestep, 'previous',0); 
+        
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
             C0 = md.friction.C;
             H0 = md.results.TransientSolution(end).Thickness;
             Zb = md.results.TransientSolution(end).Base;
-            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
+            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb, 1);
 
             % add an initial time to the friction coef vector
             md.friction.C = [C0; next_start_time];
 
-            for it = 1:end_time/dt_mu                                   
+            it_count = 0;
+            for it = 1:(end_time/gauss_timestep)-1
+                it_count = it_count + 1;
                 results = md.results.TransientSolution;
                 % restart and specify sim duration
                 md = transientrestart(md);
                 md.timestepping.time_step = 0.01;
-                md.timestepping.final_time = md.timestepping.start_time + dt_mu;
-                md.settings.output_frequency = dt_mu/md.timestepping.time_step;
+                md.timestepping.final_time = md.timestepping.start_time + gauss_timestep;
+                md.settings.output_frequency = 1;
 
                 % calculate new fric coef
                 if it == 1 % initial condition: delta(H) = 0
@@ -525,6 +587,8 @@ for jj = md_idx
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
+                C = C - delta_C_all(:,it);
+                C(C<0) = 0;
                 % append time and assign
                 current_time = md.timestepping.start_time;
                 C_add_time = [C; current_time + dt_mu];
@@ -533,12 +597,39 @@ for jj = md_idx
                 % solve
                 md = solve(md,'tr');
 
-                % save the new result to a separate var
-                new_results = [new_results,md.results.TransientSolution(1)];
+                if it == 1 % save the first time
+                    it_count = 0;
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                    % Retain only "TransientSolution"
+                    names = fieldnames(md.results);
+                    results_cell = struct2cell(md.results);
+                    md.results = cell2struct(results_cell(names == "TransientSolution"),...
+                                             names(names == "TransientSolution"));
+                    clear names results_cell
+                end
+                
+                if it_count == 10 % save every 10 time steps (every 0.1 year)
+                    it_count = 0;
+
+                    % crop out any step other than step 1 to limit some weird
+                    % over-stepping from ISSM
+                    if ~all(size(md.results.TransientSolution)==[1,1]) % more than one md.results.TransientSolution is generated
+                        result_tbl = struct2table(md.results.TransientSolution);
+                        % save timesteps
+                        result_tbl = result_tbl(result_tbl.step == 1, :);
+                        md.results.TransientSolution = table2struct(result_tbl);
+                    end
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                    % Retain only "TransientSolution"
+                    names = fieldnames(md.results);
+                    results_cell = struct2cell(md.results);
+                    md.results = cell2struct(results_cell(names == "TransientSolution"),...
+                                             names(names == "TransientSolution"));
+                    clear names results_cell result_tbl
+                end
             end
             md.results = previous_results;
             md.results.TransientSolution = new_results;
-            clear previous_results new_results
 
             savemodel(org, md);
 
