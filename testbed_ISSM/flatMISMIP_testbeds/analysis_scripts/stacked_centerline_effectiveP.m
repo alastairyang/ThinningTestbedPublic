@@ -10,6 +10,9 @@ expt_type = 'mu'; % types: "mu", "mu_plastic"
 retreat_stop_yr = 16; 
 
 %% Plot only the difference between the control and experiment 
+% specific parameter for this section
+select_md = [1];
+
 % model parameters and plot parameters
 % read in the model parameter table
 md_vars = readtable('md_var_combinations.csv');
@@ -68,8 +71,8 @@ end
 
 n_simu = size(folder_dir_groups{geom_i}, 1);
 ff = figure('Position',[100,100,900,1200]);
-tiledlayout(3,3,'TileSpacing','none')
-for j = 1:n_simu
+tiledlayout(1,2,'TileSpacing','loose')
+for j = select_md
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -156,13 +159,19 @@ for j = 1:n_simu
     if j == 1
         legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
     end
-    if ~ismember(j,[1,4,7])
-        set(gca,'YTick',[]);
-    end
-    if ~ismember(j,[7,8,9])
-        set(gca,'XTick',[])
+    if length(select_md) == n_simu % full 3x3 grid, all models
+        if ~ismember(j,[1,4,7])
+            set(gca,'YTick',[]);
+        end
+        if ~ismember(j,[7,8,9])
+            set(gca,'XTick',[])
+        else
+            set(gca,'XTick',[0,4,8,12,16,20])
+        end
     else
-        set(gca,'XTick',[0,4,8,12,16,20])
+        xticks(0:5:20);
+        yticks(0:10:60);
+        ax = gca; ax.FontSize = 13;
     end
 
     %plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
@@ -170,6 +179,12 @@ for j = 1:n_simu
 end
 cb = colorbar;
 cb.Layout.Tile = 'east';
+cb.TickLabels = num2cell(-250:50:0);
+cb.FontSize = 13;
+
+% if we are only plotting selected model
+if length(select_md)<n_simu; sgtitle(['Plots of ' num2str(select_md)]); end
+
 exportgraphics(gcf, ['plots/',save_foldername,'/',expt_type,'_',geom_type,'_diff.png'],'Resolution',600)
 
 

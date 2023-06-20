@@ -125,7 +125,7 @@ for j = 1:n_simu
 end
 clear md_ctrl md_expt
 
-%% Get integrated stress balance change
+% Get integrated stress balance change
 runme_params = readtable('runme_param.csv');
 front_x = runme_params.terminus0_x;
 total_Rs = zeros(2,n_simu);
@@ -176,6 +176,8 @@ end
 
 %% Load narrow + low fric and high fric glaciers
 % ... get map view of dH and the locations of max dH
+% This and the following sections (until stress loss) can be run
+% independently of the previous sections
 lowK_md  = load('long_models_yang/model_W5000_GL400_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
 highK_md = load('long_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
 param_tbl = readtable('runme_param.csv');
@@ -213,16 +215,15 @@ nexttile
 imagesc(y/1e3,x_c/1e3,lowK_dH); hold on;
 scatter(lowK_gl(1).y/1e3, lowK_gl(1).x/1e3,10,'k','filled'); hold on;
 colormap(nuuk); clim([-400,0])
-scatter(y(mid_yi)/1e3, x_c(maxi_low)/1e3, 50,'r','filled')
-ylabel('Along flow distance (m)','FontSize',13)
+scatter(y(mid_yi)/1e3, x_c(maxi_low)/1e3, 100,'r','filled')
+ylabel('Along flow distance (km)','FontSize',13)
 
 nexttile
 imagesc(y/1e3,x_c/1e3,highK_dH); hold on;
 scatter(highK_gl(1).y/1e3, highK_gl(1).x/1e3,10,'k','filled'); hold on;
-scatter(y(mid_yi)/1e3, x_c(maxi_high)/1e3, 50,'r','filled')
+scatter(y(mid_yi)/1e3, x_c(maxi_high)/1e3, 100,'b','filled')
 colormap(nuuk); clim([-400,0])
 colorbar
-ylabel('Along flow distance (m)','FontSize',13)
 
 % export
 exportgraphics(gcf, 'plots/composite_stressloss/dH.png','Resolution',600);
@@ -244,15 +245,17 @@ tiledlayout(2,1,"TileSpacing","none")
 nexttile
 plot(t,lowK_dH_pt,'-r','LineWidth',2);hold on;
 plot(t,highK_dH_pt,'-b','LineWidth',2); hold off;
-ylabel('m','FontSize',13)
+ylabel('meter','FontSize',13)
+legend(["H(t) at low K","H(t) at high K"])
+xlim([0,26])
 nexttile
-plot(t,lowK_front/1e3,'-r','LineWidth',2);hold on;
-plot(t,highK_front/1e3,'-b','LineWidth',2); hold on;
 plot(t,lowK_gl/1e3,':r','LineWidth',2);hold on;
-plot(t,highK_gl/1e3,':b','LineWidth',2); hold off;
+plot(t,highK_gl/1e3,':b','LineWidth',2); hold on;
+plot(t,lowK_front/1e3,'-k','LineWidth',2);hold off; % only one front is needed for plotting
+legend(["GL at low K","GL at high K","Calving front"])
 xlabel('Year','FontSize',13)
-ylabel('m','FontSize',13)
-
+ylabel('meter','FontSize',13)
+xlim([0,26])
 % export
 exportgraphics(gcf,'plots/composite_stressloss/gl_front_ht.png','Resolution',600);
 
@@ -270,17 +273,19 @@ midK_i  = find((Ws_md == 5e3) + (FCs_md == 0.6e5) == 2);
 highK_i = find((Ws_md == 5e3) + (FCs_md == 1.2e5) == 2);
 % plot stress loss vs dH
 yyaxis left
-scatter(dH_max_expt(lowK_i), total_Rs(1,lowK_i)/1e6, 90, FCs_symb(1,:), 'filled'); hold on
-scatter(dH_max_expt(midK_i), total_Rs(1,midK_i)/1e6, 90, FCs_symb(2,:), 'filled'); hold on
-scatter(dH_max_expt(highK_i), total_Rs(1,highK_i)/1e6, 90, FCs_symb(3,:), 'filled'); hold on
-ylabel('Stress loss (MPa)','FontSize',14)
+scatter(dH_max_expt(lowK_i), total_Rs(1,lowK_i)/1e6, 200, FCs_symb(1,:), 'filled'); hold on
+scatter(dH_max_expt(midK_i), total_Rs(1,midK_i)/1e6, 200, FCs_symb(2,:), 'filled'); hold on
+scatter(dH_max_expt(highK_i), total_Rs(1,highK_i)/1e6, 200, FCs_symb(3,:), 'filled'); hold on
+ylabel('Frontal sress loss (MPa m)','FontSize',14)
+set(gca,'ycolor','k') 
 % plot GL vs dH
 yyaxis right
-scatter(dH_max_expt(lowK_i), gl_expt(lowK_i)/1e3, 90, FCs_symb(1,:),'Marker','*'); hold on
-scatter(dH_max_expt(midK_i), gl_expt(midK_i)/1e3, 90, FCs_symb(2,:),'Marker','*'); hold on
-scatter(dH_max_expt(highK_i), gl_expt(highK_i)/1e3, 90, FCs_symb(3,:),'Marker','*'); hold on
+scatter(dH_max_expt(lowK_i), gl_expt(lowK_i)/1e3, 200, FCs_symb(1,:),'filled','Marker','diamond'); hold on
+scatter(dH_max_expt(midK_i), gl_expt(midK_i)/1e3, 200, FCs_symb(2,:),'filled','Marker','diamond'); hold on
+scatter(dH_max_expt(highK_i), gl_expt(highK_i)/1e3, 200, FCs_symb(3,:),'filled','Marker','diamond'); hold on
 ylabel('Grounding line retreat (km)','FontSize',14)
-xlabel('Thinning (m)','FontSize',14)
+xlabel('Maximum thinning (m)','FontSize',14)
+set(gca,'ycolor','k') 
 
 nexttile % total thinning vs GL retreat
 for j = 1:n_simu
@@ -300,6 +305,7 @@ ax = gca;
 ax.FontSize = 14;
 %ax.FontName = 'Aria';
 exportgraphics(gcf,'plots/composite_stressloss/stressloss.png','Resolution',600);
+exportgraphics(gcf,'plots/composite_stressloss/stressloss.pdf','ContentType','vector')
 
 %% OUTDATED: Plotting maximum thinning and frontal resistive stress loss 
 Ws_symb = [40,100,260];
