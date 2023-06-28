@@ -94,6 +94,10 @@ for q = 1:length(GLs) % shallow, deep
     end
 end
 
+%% Make a table and export
+dhdt_attenu_tbl = table(Ws_a(:), GLs_a(:), FCs_a(:), dL(:), maxdHdt(:));
+dhdt_attenu_tbl.Properties.VariableNames = ["Width","GL","FC coef","Attenuation Distance (m)","max dH/dt(m/a)"];
+writetable(dhdt_attenu_tbl, 'result_tables/dhdt_attenu_tbl.csv')
 %% Make a grid plot
 % Marker is filled circle, where 
 % ... the size represents the max dh/dt
@@ -132,3 +136,72 @@ xlim([-1,5]); ylim([-1,5]);
 plotname = ['scatter_effP_' num2str(depth) '.pdf'];
 
 exportgraphics(gcf,['plots/composite_effP/' plotname],'ContentType','vector')
+
+%% Profile evolution plot: we plot lateral profile of selected glaciers over time.
+% Load data
+md1 = load('long_models_yang/model_W5000_GL0_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
+md2 = load('long_models_yang/model_W11000_GL400_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
+md3 = load('long_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
+%% Recover the glacier profiles overtime
+dt = 0.1; % simulation timestep
+t_interval = 2; % time sampling interval (yr)
+ds = 50; % meter
+[surface1, base1, bed1, profiles_t1] = sample_profile_evol(md1, dt, ds, t_interval);
+[surface2, base2, bed2, profiles_t2] = sample_profile_evol(md2, dt, ds, t_interval);
+[surface3, base3, bed3, profiles_t3] = sample_profile_evol(md3, dt, ds, t_interval);
+
+%% plot
+% load colormap
+cp = load('plots/colormap/lajolla.mat').lajolla;
+
+% make the plot
+plot_x = 0:ds:(size(surface1,2)-1)*ds;
+rock_rgb = [204, 204, 204]/255;
+basevalue = -600;
+figure('Position',[100,100,1800,300])
+tiledlayout(1,3,"TileSpacing","none")
+
+nexttile
+plot(plot_x/1000, surface1,'LineWidth',1.5); hold on;
+plot(plot_x/1000, base1,'LineWidth',1); hold on;
+plot(plot_x/1000, bed1,'-','LineWidth',2, 'Color',rock_rgb); hold on;
+a = area(plot_x/1000, bed1(1,:),basevalue); hold off
+a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
+ylim([basevalue,1500]);
+line_colors = colormap_to_colororder(cp, size(surface1,1),1,100);
+colororder(line_colors)
+set(gca,'XTick',0:10:50)
+set(gca,'YTick',-600:400:1500)
+set(gca,'FontSize',16)
+ylabel('Elevation (m)','FontName','Aria','FontSize',18)
+
+nexttile
+plot(plot_x/1000, surface2,'LineWidth',1.5); hold on;
+plot(plot_x/1000, base2,'LineWidth',1); hold on;
+plot(plot_x/1000, bed2,'-','LineWidth',2, 'Color',rock_rgb); hold on;
+a = area(plot_x/1000, bed2(1,:),basevalue); hold off
+a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
+ylim([basevalue,1500])
+set(gca,'YTick',[])
+set(gca,'XTick',0:10:50)
+set(gca,'FontSize',16)
+line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
+colororder(line_colors)
+xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
+
+
+nexttile
+plot(plot_x/1000, surface3,'LineWidth',1.5); hold on;
+plot(plot_x/1000, base3,'LineWidth',1); hold on;
+plot(plot_x/1000, bed3,'-','LineWidth',2, 'Color',rock_rgb); hold on;
+a = area(plot_x/1000, bed3(1,:),basevalue); hold off
+a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
+ylim([basevalue,1500])
+set(gca,'YTick',[])
+set(gca,'XTick',0:10:60)
+set(gca,'FontSize',16)
+line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
+colororder(line_colors)
+
+exportgraphics(gcf,'plots/profiles_evolve.png','Resolution',600)
+

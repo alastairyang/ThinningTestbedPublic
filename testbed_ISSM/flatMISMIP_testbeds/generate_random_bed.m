@@ -1,3 +1,5 @@
+% This creates .mat data file containing the randomly generated bed
+% with fractal dimension of roughness specified by us.
 deltaD = 80;
 H = 0.7;
 Lx = 60000; 

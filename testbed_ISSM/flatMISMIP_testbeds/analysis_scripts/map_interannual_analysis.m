@@ -143,54 +143,6 @@ for j = 1:n_simu
     color_axis = transpose(linspace(min(abs_dist), max(abs_dist),length(dist))); % 10^0 to 10^4
 
     snps_plot_title = [md_ctrl.miscellaneous.name(9:end) '_' pulse_type '_' geom_type '_' expt_type '.png'];
-%     figure('Position',[100,100,1100,500]);
-%     % iterate over each line / control point
-%     for i = 1:length(dist)
-%         % Long term
-%         subplot(2,2,[1,2])
-%         line_color = interp1(color_axis, colors_p, abs_dist(i));
-%         if dist(i) >= 0 % downstream
-%             line_style = '-';
-%         else % upstream
-%             line_style = '--';
-%         end
-%         plot(t_axis, md_grid_mid(i,:),"Color",line_color,'LineStyle',line_style);
-%         hold on
-% 
-%         subplot(2,2,3)
-%         line_color = interp1(color_axis, colors_p, abs_dist(i));
-%         if dist(i) >= 0 % downstream
-%             line_style = '-';
-%         else % upstream
-%             line_style = '--';
-%         end
-%         plot(t_axis, LTs(i,:),"Color",line_color,'LineStyle',line_style);
-%         hold on
-% 
-%         % short term
-%         subplot(2,2,4)
-%         plot(t_axis, STs(i,:),"Color",line_color,'LineStyle',line_style);
-%         hold on
-%     end
-%     subplot(2,2,3);title('Long term'); xlabel('time');ylabel('m')
-%     subplot(2,2,4);title('Short term'); xlabel('time');ylabel('m')
-%     plot_title = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type,'.png'];
-%     exportgraphics(gcf,['plots/pulse_mu_plots/',plot_title],'Resolution',300)
-
-%     % plotting animation: H(t)
-%     [H_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, num2cell(expt_H_interp,1), 50);
-%     figure('Position',[100,100,1100,450]);
-%     for i = 1:260
-%         imagesc(x,y,squeeze(md_grid(:,:,i)));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
-%         pause(0.005);
-%     end
-%     % plotting animation: dH(t)/dt
-%     dt = 0.1;
-%     figure('Position',[100,100,1100,450]);
-%     for i = 2:260
-%         imagesc(x,y,squeeze((md_grid(:,:,i)-md_grid(:,:,i-1))/dt));title(num2str(i/10));hold on;clim([-5,5]);colormap(diverg_colormap(50));colorbar;
-%         pause(0.005);
-%     end
 
     is = [178,188];
 %     if j == 3

@@ -1,3 +1,11 @@
+%% Analysis of effective pressure experiment at a wavy/rough bed
+% This script creates figure 5 in the main text
+% Author: Donglai Yang
+% Date: June 27, 2023
+%% Load data, "md"
+load('wavybed_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat')
+
+%% Extract data
 sample_interval = 400; % meter; distance between two control points
 sample_number = 1; % make # samples along the center line
 ds = 50; % grid spacing, meter
@@ -23,7 +31,6 @@ Ly = max(md.mesh.y);
 x = 0:ds:Lx-ds;
 y = 0:ds:Ly-ds;
 [X,Y] = meshgrid(x,y);
-[X,~] = meshgrid(x, y);
 if rem(size(X,1), 2) == 0
     mid_i = size(X,1)/2-10;
 else
@@ -95,36 +102,37 @@ stt = diff(thalweg_sample_st,1,1);
 %% Load wavy bed data
 wavybed = load('random_beds/dD80_H07_RO4000_3_grid.mat').wavybed;
 
-%% plot
+%% plot the glacier lateral profile evolution
+% load colormap
+cp = load('plots/colormap/lajolla.mat').lajolla;
+
 figure('Position',[100,100,800,500])
+% thickness change
 tiledlayout(2,1,'TileSpacing','tight')
-%subplot(3,1,1)
 nexttile
 yyaxis left;
 plot(ht_data.t(1:end), thalweg_sample_ht,'-b','LineWidth',1.5);colororder(cool(sample_number)); hold on;
-ylabel('m','FontSize',13)
+ylabel('Meter','FontSize',13)
 hold on;
-%plot(ht_data.t(1:end-1), htt,'-k','LineWidth',1.5);colororder(cool(sample_number)); hold on;
 yyaxis right;
 plot(ht_data.t(1:end-1), front_locs(1:258)/1000,'-.r','LineWidth',1.5);hold on;
 plot(ht_data.t(1:end-1),gl_locs(1:258)/1000,'-.b','LineWidth',1.5)
 legend(["H(t)","Front","Grounding Line"],'FontSize',13,'Location','southwest')
-ylabel('km','FontSize',13)
+ylabel('Kilometer','FontSize',13)
 xlabel('Year','FontSize',13)
 xlim([0,26])
 
 % profile
-%subplot(3,1,2)
 nexttile
-plot_all_profiles(md,10)
+[x_plot, bed_plot,~,~] = plot_all_profiles(md,10,cp); hold on;
 % add a dashed line at where the timeseries is taken
-xline(sample_x/1000,'-.b','LineWidth',0.5)
+xline(sample_x/1000,':k','LineWidth',2)
 xlabel('Along flow direction (km)','FontSize',13);
 ylabel('Elevation (m)','FontSize',13);
 
 exportgraphics(gcf, 'plots/wavybed_gl_retreat_line.png','Resolution',600)
 
-%% Map view
+%% Map view of bed topography and thinning rate
 % crop the plan view extent (zoom in)
 x_lim = [3e4, 5e4];
 y_lim = [3e3, 9e3];
@@ -171,7 +179,7 @@ xticks([35,40,45])
 exportgraphics(gcf, 'plots/wavybed_gl_retreat_map.png','Resolution',600)
 
 %% functions
-function plot_all_profiles(md, skip)
+function [x,bed_profile, surface_profiles, base_profiles] = plot_all_profiles(md, skip, colormap_p)
 
     if nargin == 1; skip = 1; end
     nt = size(md.results.TransientSolution,2);
@@ -179,52 +187,68 @@ function plot_all_profiles(md, skip)
     warning('off',warning_id)
 
     % color gradient
-    color_length = nt;
-    red = [255, 51, 153]/255;
-    sth = [153, 153, 255]/255;
-    colors_p = [linspace(red(1),sth(1),color_length)',...
-                linspace(red(2),sth(2),color_length)',...
-                linspace(red(3),sth(3),color_length)'];
+    if nargin < 3 % if colormap not provided
+        color_length = nt;
+        red = [255, 51, 153]/255;
+        sth = [153, 153, 255]/255;
+        colors_p = [linspace(red(1),sth(1),color_length)',...
+                    linspace(red(2),sth(2),color_length)',...
+                    linspace(red(3),sth(3),color_length)'];
+    else
+        % create color order from colormap
+        n_c = length(1:skip:nt);
+        colors_p = colormap_to_colororder(colormap_p, n_c,1,100);
+        colors_p = repelem(colors_p, 2*ones(n_c,1), 1);
+    end
+    % bedrock color
+    rock_rgb = [204, 204, 204]/255;
+    % y base
+    basevalue = -600;
     
     % geometry parameters
     Lx = max(md.mesh.x);
     Ly = max(md.mesh.y);
     ds = 250; % spacing, 250 meter
-    x = 0:ds:Lx;
-    y = 0:ds:Ly;
+    x = 0:ds:Lx-ds;
+    y = 0:ds:Ly-ds;
     [X,~] = meshgrid(x, y);
     if rem(size(X,1), 2) == 0
         mid_i = size(X,1)/2;
     else
         mid_i = (size(X,1)+1)/2;
     end
-    thalweg_x = X(mid_i,:);
-
     bed = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
             md.geometry.bed,...
             x, y, NaN);
     bed_profile = bed(mid_i,:);
-    plot(x/1000, bed_profile, 'black');hold on;
+
+    % preallocate
+    surface_profiles = [];
+    base_profiles = [];
+
+    % plot bed profile first
     for i = 1:skip:nt
-        
+        % mesh to grid
         surface = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
             md.results.TransientSolution(i).Surface,...
             x, y, NaN);
         base = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
             md.results.TransientSolution(i).Base,...
             x, y, NaN);
-        bed = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
-            md.geometry.bed,...
-            x, y, NaN);
         surface_profile  = surface(mid_i,:);
         base_profile = base(mid_i,:);
+        surface_profiles = [surface_profiles; surface_profile];
+        base_profiles = [base_profiles; base_profile];
+        % plot
+        plot(x/1000, surface_profile, 'LineWidth',1.2); hold on
+        plot(x/1000, base_profile, 'LineWidth',1.2);hold on
         
-        plot(x/1000, bed_profile, 'k');hold on;
-        plot(x/1000, surface_profile, 'Color',colors_p(nt+1-i,:)); hold on
-        plot(x/1000, base_profile,'Color',colors_p(nt+1-i,:));hold on
-        
-        %hold off
-        ylim([-800,1500])
+        ylim([basevalue,1500])
     end
-    hold off
+    plot(x/1000, bed_profile, 'black');hold on;
+    colororder(colors_p)
+    % color the bed
+    a = area(x/1000, bed_profile, basevalue); hold off
+    a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
+
 end
