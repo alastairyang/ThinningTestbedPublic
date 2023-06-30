@@ -13,22 +13,67 @@ front_xy_interp = [front_x_interp, transpose(y(y_crop))];
 dist_to_front = abs(front_x_interp - X_crop);
 
 %% SNR
-    % we use uniform distribution between low and high threshold
-    noise_lowamp  = 0; % lower bar 0 m uncertainty
-    noise_highamp = 0.5; % higher bar 0.5 m uncertainty
-    n_samples = 500; % 200 random sampling of noise amplitude
-    amp_rand = (noise_highamp - noise_lowamp).*rand(n_samples,size(expt_S_grid_v,2)) + noise_lowamp;
-    noise = transpose(sqrt(amp_rand)/3.*transpose(randn(size(md_grid_v,2),n_samples)));
-    snr_ht = zeros(size(md_grid_v,1),n_samples);
-    for ni = 1:n_samples
-        for k = 1:size(md_grid_v,1)
-            if sum(isnan(md_grid_v(k,:)))>0 % skip nan
-                snr_ht(k,ni) = nan;
-            else
-                snr_ht(k,ni) = snr(md_grid_v(k,:), noise(:,ni));
-            end
+% we use uniform distribution between low and high threshold
+noise_lowamp  = 0; % lower bar 0 m uncertainty
+noise_highamp = 0.5; % higher bar 0.5 m uncertainty
+n_samples = 500; % 200 random sampling of noise amplitude
+amp_rand = (noise_highamp - noise_lowamp).*rand(n_samples,size(expt_S_grid_v,2)) + noise_lowamp;
+noise = transpose(sqrt(amp_rand)/3.*transpose(randn(size(md_grid_v,2),n_samples)));
+snr_ht = zeros(size(md_grid_v,1),n_samples);
+for ni = 1:n_samples
+    for k = 1:size(md_grid_v,1)
+        if sum(isnan(md_grid_v(k,:)))>0 % skip nan
+            snr_ht(k,ni) = nan;
+        else
+            snr_ht(k,ni) = snr(md_grid_v(k,:), noise(:,ni));
         end
     end
+end
+
+%% locate peak ampitude function
+function locs = local_perturb_peaktime(data, t, rel_loc, t_crop, period)
+%LOCAL_PERTURB_PEAKTIME find the arrival time of the kinematic wave
+%initiated by the localized basal perturbation. The we find the time by
+%looking for the time where the peak in signal is observed.
+
+    if nargin < 4; t_crop = 7; period = 2; end % chop out first 7 years
+    if nargin < 5; period = 2; end
+
+    % chop the initial extra time
+    dt = mean(t(2:end) - t(1:end-1));
+    n_crop = t_crop/dt;
+    data = data(n_crop+1:end);
+    t = t(n_crop+1:end);
+    % split into multiple periods
+    % find the number of complete periods
+    n_period = period/dt;
+    num_period = floor(length(data)/n_period);
+    data = data(1:n_period*num_period);
+    t = t(1:n_period*num_period);
+    if size(data,1) ~= 1 % reshape into a row vector
+        data = data';
+    end
+    data_periods = reshape(data, n_period, num_period);
+    t_period = 0:dt:period-dt;
+    % make signal peak positive
+    switch rel_loc
+        case "up"
+            data_periods = data_periods*(-1); % invert so that max is a peak, not trough
+        case "down"
+            return
+    end
+    locs = zeros(size(data_periods,2),1);
+    for i = 1:size(data_periods, 2)
+        [pk, loc] = findpeaks(data_periods(:,i),t_period);
+        if length(loc)>1 || isempty(loc)
+            disp('Found multiple/zero peaks! Returning...')
+            return 
+        else
+            locs(i) = loc;
+        end
+    end
+    
+end
 
 
 %% Seasonal calving step in runme

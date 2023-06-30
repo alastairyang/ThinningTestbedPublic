@@ -1,8 +1,8 @@
 %% Summarize average thinning rate and attenuation distance in one scatter grid plot
-% effective pressure experiment
-
-% Attenuation distance is defined as to distance to the ice front where the
-% 63% of total culmulative thinning has been registered.
+% ...for effective pressure experiment
+% This is figure 2 in the main text
+% Author: Donglai Yang
+% Date: June 28, 2023
 
 %% Main script
 % load model parameter
@@ -135,6 +135,7 @@ end
 xlim([-1,5]); ylim([-1,5]);
 plotname = ['scatter_effP_' num2str(depth) '.pdf'];
 
+% export the plot
 exportgraphics(gcf,['plots/composite_effP/' plotname],'ContentType','vector')
 
 %% Profile evolution plot: we plot lateral profile of selected glaciers over time.
@@ -161,6 +162,7 @@ basevalue = -600;
 figure('Position',[100,100,1800,300])
 tiledlayout(1,3,"TileSpacing","none")
 
+% glacier 1: fully grounded, narrow, and low basal drag
 nexttile
 plot(plot_x/1000, surface1,'LineWidth',1.5); hold on;
 plot(plot_x/1000, base1,'LineWidth',1); hold on;
@@ -175,6 +177,7 @@ set(gca,'YTick',-600:400:1500)
 set(gca,'FontSize',16)
 ylabel('Elevation (m)','FontName','Aria','FontSize',18)
 
+% glacier 2: floating termini, narrow, and low basal drag
 nexttile
 plot(plot_x/1000, surface2,'LineWidth',1.5); hold on;
 plot(plot_x/1000, base2,'LineWidth',1); hold on;
@@ -189,7 +192,7 @@ line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
 colororder(line_colors)
 xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
 
-
+% glacier 3: floating termini, narrow, and large basal drag
 nexttile
 plot(plot_x/1000, surface3,'LineWidth',1.5); hold on;
 plot(plot_x/1000, base3,'LineWidth',1); hold on;

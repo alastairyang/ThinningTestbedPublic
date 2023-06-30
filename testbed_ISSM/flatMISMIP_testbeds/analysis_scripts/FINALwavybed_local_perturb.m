@@ -1,17 +1,21 @@
 %% Analyze the localized basal perturbation at an underdeepening section of a fractal rough bed
-% Date: June 21, 2023
+% This creates figure 6 in the main text
+% Date: June 28, 2023
 % Author: Donglai Yang
+
 %% Parameter
 pulse_type = "Pulse";
 ds = 100;
-
 % load parameter table
 runme_params = readtable('runme_param.csv');
 
-%% load data
+%% load model data
+% ctrl: control
+% expt: localized basal perturbation
 md_ctrl = load('wavybed_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
 md_expt = load('wavybed_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading_PulseGaussianPerturb_8.mat').md;
 
+% convert to table for ease of data processing
 results_tbl_expt = struct2table(md_expt.results.TransientSolution);
 results_tbl_ctrl = struct2table(md_ctrl.results.TransientSolution);
 % get model information
@@ -34,13 +38,14 @@ gls_expt = zeros(size(t_expt));
 gls_ctrl = zeros(size(t_ctrl));
 front = zeros(size(t_ctrl));
 for i = 1:size(md_ctrl.results.TransientSolution,2)
-    % gl
+    % grounding line
     gls_expt(i) = locate_groundingline(md_expt, md_expt.results.TransientSolution(i).MaskOceanLevelset);
     gls_ctrl(i) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset);
     % front
     front(i) = locate_calvingfront(md_ctrl, md_ctrl.results.TransientSolution(i).MaskIceLevelset);
 end
-% interpolate
+% interpolate onto the same time axis, in case there is a one timestep
+% offset in certain simulations
 gls_expt_interp = interp1(t_expt, gls_expt, t_ctrl);
 gls_diff = gls_expt_interp - gls_ctrl;
 
@@ -55,21 +60,24 @@ md_grid_mids = squeeze(md_grid(mid_y,:,:));
 gls_expt_c = gls_expt(start_t/dt+1:end);
 front_c = front(start_t/dt+1:end);
 
-%% MAKING THE FIGURE!
+%% Create the figure
 ff = figure('Position',[100,100,700,600]);
 plot_t = 0:0.1:size(md_grid_mids, 2)/10-0.1;
 plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
+% Hovmoller diagram
 imagesc(plot_t, plot_x, md_grid_mids, 'AlphaData',~isnan(md_grid_mids)); hold on
 hax = gca; hax.YTickLabel = flipud(hax.YTickLabel);
 set(gca,'YTick',[20,30,40,50])
-%set(gca,'XTick',[])
-ylabel('Distance to front (km)','FontName','Aria','FontSize',15)
+ylabel('Distance to front (km)','FontSize',18)
 % add grounding line and calving front
 plot(plot_t, gls_expt_c/1000,'-k','LineWidth',1.2); hold on
 plot(plot_t, front_c/1000, '-.k','LineWidth',1.2); hold on
 % add the end-of-perturbation dashline
 xline(16,':k','LineWidth',1.2); hold off
+ax = gca;
+ax.FontSize = 18;
 
+% add the pulse timeseries depending on its type
 switch pulse_type
     case "Diffu"
         clim([-10,10]);
@@ -93,8 +101,9 @@ anomaly(plot_gl_t(start_t/dt+1:end)-plot_gl_t(start_t/dt+1), gls_diff(start_t/dt
 ylim([-50,5])
 hold on;
 set(gca, 'YDir','reverse')
-xlim([0, end_t-5]); ylabel('GL(m)','FontName','Aria','FontSize',12)
+xlim([0, end_t-5]); ylabel('GL(m)','FontName','Aria','FontSize',18)
 xlabel('Time (yr)','FontName','Aria')
+
 % add pulse
 yyaxis right
 dtt = 0.01;
@@ -105,7 +114,7 @@ switch pulse_type; case "Diffu"; ylim([0,0.2]); case "Pulse"; ylim([0,1]);otherw
 set(gca,'Ytick',[])
 ax = gca;
 ax.YAxis(1).Color = 'k';
-ax.FontSize = 13;
+ax.FontSize = 18;
 % add the end-of-perturbation dashline
 xline(16,':k','LineWidth',1.2); hold off
 

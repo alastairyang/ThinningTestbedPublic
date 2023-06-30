@@ -1,4 +1,5 @@
 %% thinning, GL, and frontal resistive stress loss
+% This creates figure 7 in the main text
 % Author: Donglai Yang
 % Date: June 27, 2023
 
