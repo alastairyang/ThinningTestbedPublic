@@ -58,7 +58,7 @@ tic
 % options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
 
 % model iteration
-for jj = md_idx
+for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
 
     var_table = mdvar_combs(jj,:);
 
@@ -79,7 +79,7 @@ for jj = md_idx
     end
 
     % step iteration
-    for steps = 12
+    for steps = 13:15
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1604,6 +1604,315 @@ for jj = md_idx
             md.results = previous_results;
             md.results.TransientSolution = new_results;
 
+            savemodel(org, md);
+
+            % run time in seconds, print in minutes
+            runTime = toc;
+            runtimeTbl{jj,1} = string(geometry_name);
+            runtimeTbl{jj,2} = runTime/60;
+            runtimeTbl{jj,3} = steps;
+            runtimeTbl{jj,4} = datetime;
+            writetable(runtimeTbl, tbl_filename);
+            disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
+        end
+
+        if perform(org, 'Transient_MassUnloading_Extended')% {{{1 STEP 13
+            md = loadmodel(org, 'Transient_Calving_MassUnloading');
+
+            % parameter regarding time
+            duration = 50; 
+
+            start_time = md.timestepping.final_time;
+            md.timestepping = timestepping(); 
+            md.timestepping.start_time = start_time;
+            dt_mu = 0.1; % mass unloading update dt
+            %dt_calve = 1; % calving front position update dt
+
+            % simulation config
+            np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
+            cluster = generic('name', oshostname(), 'np', np);
+            md.cluster = cluster;
+            % relax max iteration
+            md.stressbalance.maxiter=100;
+            % do not interpolate forcing
+            md.timestepping.interp_forcing = 0;
+            
+            %% Mass unloading
+            % save previous fields separately
+            % this step help re-assembles all results later easily
+            md_temp = transientrestart(md);
+            previous_results = md_temp.results;
+            next_start_time = md_temp.timestepping.start_time;
+            clear md_temp
+            
+            % initialize
+            new_results = [];
+            % get the equivalent coefficients if using Budd sliding law
+            law_from = 'Weertman';
+            law_to = 'Budd';
+            C0 = md.friction.C(1:end-1,end);
+            H0 = md.results.TransientSolution(end).Thickness;
+            Zb = md.results.TransientSolution(end).Base;
+            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
+
+            % add an initial time to the friction coef vector
+            md.friction.C = [C0; next_start_time];
+
+            % No extra model output request
+            md.stressbalance.requested_outputs={'default'};
+
+            % time steps where we save the results
+            save_yr = 2; % save every two years
+            it_save = 1:(2/dt_mu):duration/dt_mu;
+            for it = 1:duration/dt_mu            
+
+                results = md.results.TransientSolution;
+                % restart and specify sim duration
+                md = transientrestart(md);
+                md.timestepping.time_step = 0.01;
+                md.timestepping.final_time = md.timestepping.start_time + dt_mu;
+                md.settings.output_frequency = dt_mu/md.timestepping.time_step;
+
+                % calculate new fric coef
+                if it == 1 % initial condition: delta(H) = 0
+                    deltaH = zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
+                    C = C0;
+                else
+                    deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
+                end
+                ocean_mask = results(end).MaskOceanLevelset;
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
+                % append time and assign
+                current_time = md.timestepping.start_time;
+                C_add_time = [C; current_time + dt_mu];
+                md.friction.C = [md.friction.C, C_add_time];
+
+                % solve
+                md = solve(md,'tr');
+
+                % concatenate results for every 2 years
+                if ismember(it, it_save)
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                end
+
+                % crop out any step outside step 10 to limit some weird
+                % over-stepping from ISSM when re-starting the run
+                result_tbl = struct2table(md.results.TransientSolution);
+                result_tbl = result_tbl(result_tbl.step <= 10, :);
+                md.results.TransientSolution = table2struct(result_tbl);
+            end
+
+            md.results = previous_results;
+            md.results.TransientSolution = new_results;
+            clear previous_results new_results
+            savemodel(org, md);
+
+            % run time in seconds, print in minutes
+            runTime = toc;
+            runtimeTbl{jj,1} = string(geometry_name);
+            runtimeTbl{jj,2} = runTime/60;
+            runtimeTbl{jj,3} = steps;
+            runtimeTbl{jj,4} = datetime;
+            writetable(runtimeTbl, tbl_filename);
+            disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
+        end
+
+        if perform(org, 'Transient_LocalPerturb_Pulse_Extended')% {{{1 STEP 14
+            md = loadmodel(org, pulse_gauss_mu_title);
+
+            % parameter regarding time
+            duration = 50; 
+
+            start_time = md.timestepping.final_time;
+            md.timestepping = timestepping(); 
+            md.timestepping.start_time = start_time;
+            dt_mu = 0.1; % mass unloading update dt
+            %dt_calve = 1; % calving front position update dt
+
+            % simulation config
+            np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
+            cluster = generic('name', oshostname(), 'np', np);
+            md.cluster = cluster;
+            % relax max iteration
+            md.stressbalance.maxiter=100;
+            % do not interpolate forcing
+            md.timestepping.interp_forcing = 0;
+            
+            %% Mass unloading
+            % save previous fields separately
+            % this step help re-assembles all results later easily
+            md_temp = transientrestart(md);
+            previous_results = md_temp.results;
+            next_start_time = md_temp.timestepping.start_time;
+            clear md_temp
+            
+            % initialize
+            new_results = [];
+            % get the equivalent coefficients if using Budd sliding law
+            law_from = 'Weertman';
+            law_to = 'Budd';
+            C0 = md.friction.C(1:end-1,end);
+            H0 = md.results.TransientSolution(end).Thickness;
+            Zb = md.results.TransientSolution(end).Base;
+            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
+
+            % add an initial time to the friction coef vector
+            md.friction.C = [C0; next_start_time];
+
+            % No extra model output request
+            md.stressbalance.requested_outputs={'default'};
+
+            % time steps where we save the results
+            save_yr = 2; % save every two years
+            it_save = 1:(2/dt_mu):duration/dt_mu;
+            for it = 1:duration/dt_mu            
+
+                results = md.results.TransientSolution;
+                % restart and specify sim duration
+                md = transientrestart(md);
+                md.timestepping.time_step = 0.01;
+                md.timestepping.final_time = md.timestepping.start_time + dt_mu;
+                md.settings.output_frequency = dt_mu/md.timestepping.time_step;
+
+                % calculate new fric coef
+                if it == 1 % initial condition: delta(H) = 0
+                    deltaH = zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
+                    C = C0;
+                else
+                    deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
+                end
+                ocean_mask = results(end).MaskOceanLevelset;
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
+                % append time and assign
+                current_time = md.timestepping.start_time;
+                C_add_time = [C; current_time + dt_mu];
+                md.friction.C = [md.friction.C, C_add_time];
+
+                % solve
+                md = solve(md,'tr');
+
+                % concatenate results for every 2 years
+                if ismember(it, it_save)
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                end
+
+                % crop out any step outside step 10 to limit some weird
+                % over-stepping from ISSM when re-starting the run
+                result_tbl = struct2table(md.results.TransientSolution);
+                result_tbl = result_tbl(result_tbl.step <= 10, :);
+                md.results.TransientSolution = table2struct(result_tbl);
+            end
+            
+            md.results = previous_results;
+            md.results.TransientSolution = new_results;
+            clear previous_results new_results
+            savemodel(org, md);
+
+            % run time in seconds, print in minutes
+            runTime = toc;
+            runtimeTbl{jj,1} = string(geometry_name);
+            runtimeTbl{jj,2} = runTime/60;
+            runtimeTbl{jj,3} = steps;
+            runtimeTbl{jj,4} = datetime;
+            writetable(runtimeTbl, tbl_filename);
+            disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
+        end
+
+        if perform(org, 'Transient_LocalPerturb_Diffu_Extended')% {{{1 STEP 15
+            md = loadmodel(org, diffu_gauss_mu_title);
+
+            % parameter regarding time
+            duration = 50; 
+
+            start_time = md.timestepping.final_time;
+            md.timestepping = timestepping(); 
+            md.timestepping.start_time = start_time;
+            dt_mu = 0.1; % mass unloading update dt
+            %dt_calve = 1; % calving front position update dt
+
+            % simulation config
+            np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
+            cluster = generic('name', oshostname(), 'np', np);
+            md.cluster = cluster;
+            % relax max iteration
+            md.stressbalance.maxiter=100;
+            % do not interpolate forcing
+            md.timestepping.interp_forcing = 0;
+            
+            %% Mass unloading
+            % save previous fields separately
+            % this step help re-assembles all results later easily
+            md_temp = transientrestart(md);
+            previous_results = md_temp.results;
+            next_start_time = md_temp.timestepping.start_time;
+            clear md_temp
+            
+            % initialize
+            new_results = [];
+            % get the equivalent coefficients if using Budd sliding law
+            law_from = 'Weertman';
+            law_to = 'Budd';
+            C0 = md.friction.C(1:end-1,end);
+            H0 = md.results.TransientSolution(end).Thickness;
+            Zb = md.results.TransientSolution(end).Base;
+            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
+
+            % add an initial time to the friction coef vector
+            md.friction.C = [C0; next_start_time];
+
+            % No extra model output request
+            md.stressbalance.requested_outputs={'default'};
+
+            % time steps where we save the results
+            save_yr = 2; % save every two years
+            it_save = 1:(2/dt_mu):duration/dt_mu;
+            for it = 1:duration/dt_mu            
+
+                results = md.results.TransientSolution;
+                % restart and specify sim duration
+                md = transientrestart(md);
+                md.timestepping.time_step = 0.01;
+                md.timestepping.final_time = md.timestepping.start_time + dt_mu;
+                md.settings.output_frequency = dt_mu/md.timestepping.time_step;
+
+                % calculate new fric coef
+                if it == 1 % initial condition: delta(H) = 0
+                    deltaH = zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
+                    C = C0;
+                else
+                    deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
+                end
+                ocean_mask = results(end).MaskOceanLevelset;
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
+                % append time and assign
+                current_time = md.timestepping.start_time;
+                C_add_time = [C; current_time + dt_mu];
+                md.friction.C = [md.friction.C, C_add_time];
+
+                % solve
+                md = solve(md,'tr');
+
+                % concatenate results for every 2 years
+                if ismember(it, it_save)
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                end
+
+                % crop out any step outside step 10 to limit some weird
+                % over-stepping from ISSM when re-starting the run
+                result_tbl = struct2table(md.results.TransientSolution);
+                result_tbl = result_tbl(result_tbl.step <= 10, :);
+                md.results.TransientSolution = table2struct(result_tbl);
+            end
+            
+            md.results = previous_results;
+            md.results.TransientSolution = new_results;
+            clear previous_results new_results
             savemodel(org, md);
 
             % run time in seconds, print in minutes
