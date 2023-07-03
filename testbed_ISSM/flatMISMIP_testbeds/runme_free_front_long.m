@@ -67,13 +67,13 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
     bg_fric_coef = var_table.('background_friccoef');
 
     % names
-    modelname = 'yang';
+    modelername = 'yang';
     identifier = ['_W', num2str(Ly), '_GL', num2str(delta_gl_depth), '_FC', num2str(bg_fric_coef)];
     geometry_name = ['domain', identifier];
     par_name = ['par', identifier];
 
     % make folder for experiment (i.e., this combination of parameters)
-    foldername = ['long_models_' modelname '/model' identifier];
+    foldername = ['long_models_' modelername '/model' identifier];
     if ~exist(foldername, 'dir')
         mkdir(foldername)
     end
@@ -87,7 +87,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
         waitonlock = 10;
 
         % Run steps
-        org=organizer('repository',foldername,'prefix',['MISMIP_' modelname],'steps',steps);
+        org=organizer('repository',foldername,'prefix',['MISMIP_' modelername],'steps',steps);
 
         if perform(org, 'Mesh_and_Parameterization') % {{{1  STEP 1
 
@@ -1620,7 +1620,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md = loadmodel(org, 'Transient_Calving_MassUnloading');
 
             % parameter regarding time
-            duration = 50; 
+            duration = 100; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1641,7 +1641,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
-            previous_results = md_temp.results;
+            %previous_results = md_temp.results;
             next_start_time = md_temp.timestepping.start_time;
             clear md_temp
             
@@ -1662,8 +1662,8 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 2; % save every two years
-            it_save = 1:(2/dt_mu):duration/dt_mu;
+            save_yr = 4; % save every __ years
+            it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
                 results = md.results.TransientSolution;
@@ -1704,9 +1704,9 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
                 md.results.TransientSolution = table2struct(result_tbl);
             end
 
-            md.results = previous_results;
+            md.results = [];
             md.results.TransientSolution = new_results;
-            clear previous_results new_results
+            clear new_results
             savemodel(org, md);
 
             % run time in seconds, print in minutes
@@ -1723,7 +1723,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md = loadmodel(org, pulse_gauss_mu_title);
 
             % parameter regarding time
-            duration = 50; 
+            duration = 100; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1744,7 +1744,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
-            previous_results = md_temp.results;
+            %previous_results = md_temp.results;
             next_start_time = md_temp.timestepping.start_time;
             clear md_temp
             
@@ -1765,8 +1765,8 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 2; % save every two years
-            it_save = 1:(2/dt_mu):duration/dt_mu;
+            save_yr = 4; % save every __ years
+            it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
                 results = md.results.TransientSolution;
@@ -1807,9 +1807,9 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
                 md.results.TransientSolution = table2struct(result_tbl);
             end
             
-            md.results = previous_results;
+            md.results = [];
             md.results.TransientSolution = new_results;
-            clear previous_results new_results
+            clear new_results
             savemodel(org, md);
 
             % run time in seconds, print in minutes
@@ -1826,7 +1826,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md = loadmodel(org, diffu_gauss_mu_title);
 
             % parameter regarding time
-            duration = 50; 
+            duration = 100; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1847,7 +1847,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
-            previous_results = md_temp.results;
+            %previous_results = md_temp.results;
             next_start_time = md_temp.timestepping.start_time;
             clear md_temp
             
@@ -1868,8 +1868,8 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 2; % save every two years
-            it_save = 1:(2/dt_mu):duration/dt_mu;
+            save_yr = 4; % save every __ years
+            it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
                 results = md.results.TransientSolution;
@@ -1910,9 +1910,9 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
                 md.results.TransientSolution = table2struct(result_tbl);
             end
             
-            md.results = previous_results;
+            md.results = [];
             md.results.TransientSolution = new_results;
-            clear previous_results new_results
+            clear new_results
             savemodel(org, md);
 
             % run time in seconds, print in minutes
