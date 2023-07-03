@@ -94,11 +94,14 @@ for q = 1:length(GLs) % shallow, deep
     end
 end
 
-%% Make a table and export
+%%%% ---------------
+% Make a table and export
 dhdt_attenu_tbl = table(Ws_a(:), GLs_a(:), FCs_a(:), dL(:), maxdHdt(:));
 dhdt_attenu_tbl.Properties.VariableNames = ["Width","GL","FC coef","Attenuation Distance (m)","max dH/dt(m/a)"];
 writetable(dhdt_attenu_tbl, 'result_tables/dhdt_attenu_tbl.csv')
-%% Make a grid plot
+
+%%%% ---------------
+% Make a grid plot
 % Marker is filled circle, where 
 % ... the size represents the max dh/dt
 % ... the color represents the attenuation distance
@@ -138,20 +141,53 @@ plotname = ['scatter_effP_' num2str(depth) '.pdf'];
 % export the plot
 exportgraphics(gcf,['plots/composite_effP/' plotname],'ContentType','vector')
 
+%% Generate a color bar for the attenuation distance
+color_len = 10;
+colors_p = [linspace(red(1),magenta(1),color_len)',...
+            linspace(red(2),magenta(2),color_len)',...
+            linspace(red(3),magenta(3),color_len)'];
+figure('Position',[100,100,500,500])
+imagesc(dL/1e3);colormap(colors_p); 
+cb = colorbar;
+cb.Ticks = 20:4:34;
+cb.FontSize = 16;
+
+% save graph
+exportgraphics(gcf,'plots/attenuL_colorbar.pdf','ContentType','vector')
+
+%% Generate a fake circle sequence as a "colorbar" for max dh/dt
+dhdt_fake = [4, 7, 10, 13];
+x_fake = [10,30,50,70];
+y_fake = 50;
+
+figure('Position',[100,100,600,600])
+for c_i = 1:length(dhdt_fake)
+    size_interp_fake = interp1(maxdHdt_range, size_range, dhdt_fake(c_i));
+    scatter(x_fake(c_i), y_fake, exp(size_interp_fake), 'k','filled');
+    hold on;
+end
+xlim([0,100])
+exportgraphics(gcf,'plots/maxdHdt_colorbar.pdf','ContentType','vector')
+
 %% Profile evolution plot: we plot lateral profile of selected glaciers over time.
 % Load data
 md1 = load('long_models_yang/model_W5000_GL0_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
 md2 = load('long_models_yang/model_W11000_GL400_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
 md3 = load('long_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
-%% Recover the glacier profiles overtime
+md4 = load('long_models_yang/model_W5000_GL400_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
+
+%%%% ---------------
+% Recover the glacier profiles overtime
 dt = 0.1; % simulation timestep
 t_interval = 2; % time sampling interval (yr)
 ds = 50; % meter
 [surface1, base1, bed1, profiles_t1] = sample_profile_evol(md1, dt, ds, t_interval);
 [surface2, base2, bed2, profiles_t2] = sample_profile_evol(md2, dt, ds, t_interval);
 [surface3, base3, bed3, profiles_t3] = sample_profile_evol(md3, dt, ds, t_interval);
+[surface4, base4, bed4, profiles_t4] = sample_profile_evol(md4, dt, ds, t_interval);
 
-%% plot
+%% ---------------
+% plot
 % load colormap
 cp = load('plots/colormap/lajolla.mat').lajolla;
 
@@ -159,8 +195,8 @@ cp = load('plots/colormap/lajolla.mat').lajolla;
 plot_x = 0:ds:(size(surface1,2)-1)*ds;
 rock_rgb = [204, 204, 204]/255;
 basevalue = -600;
-figure('Position',[100,100,1800,300])
-tiledlayout(1,3,"TileSpacing","none")
+figure('Position',[100,100,1000,500])
+tiledlayout(2,2,"TileSpacing","none")
 
 % glacier 1: fully grounded, narrow, and low basal drag
 nexttile
@@ -172,8 +208,8 @@ a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,1500]);
 line_colors = colormap_to_colororder(cp, size(surface1,1),1,100);
 colororder(line_colors)
-set(gca,'XTick',0:10:50)
-set(gca,'YTick',-600:400:1500)
+set(gca,'XTick',[])
+set(gca,'YTick',-600:400:1300)
 set(gca,'FontSize',16)
 ylabel('Elevation (m)','FontName','Aria','FontSize',18)
 
@@ -186,11 +222,10 @@ a = area(plot_x/1000, bed2(1,:),basevalue); hold off
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,1500])
 set(gca,'YTick',[])
-set(gca,'XTick',0:10:50)
+set(gca,'XTick',[])
 set(gca,'FontSize',16)
 line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
 colororder(line_colors)
-xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
 
 % glacier 3: floating termini, narrow, and large basal drag
 nexttile
@@ -200,11 +235,30 @@ plot(plot_x/1000, bed3,'-','LineWidth',2, 'Color',rock_rgb); hold on;
 a = area(plot_x/1000, bed3(1,:),basevalue); hold off
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,1500])
+set(gca,'YTick',-600:400:1300)
+set(gca,'XTick',0:10:50)
+set(gca,'FontSize',16)
+line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
+colororder(line_colors)
+xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
+ylabel('Elevation (m)','FontName','Aria','FontSize',18)
+
+
+% glacier 4: floating termini, narrow, and large basal drag
+nexttile
+plot(plot_x/1000, surface4,'LineWidth',1.5); hold on;
+plot(plot_x/1000, base4,'LineWidth',1); hold on;
+plot(plot_x/1000, bed4,'-','LineWidth',2, 'Color',rock_rgb); hold on;
+a = area(plot_x/1000, bed4(1,:),basevalue); hold off
+a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
+ylim([basevalue,1500])
 set(gca,'YTick',[])
 set(gca,'XTick',0:10:60)
 set(gca,'FontSize',16)
 line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
 colororder(line_colors)
+xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
 
+% save graph
 exportgraphics(gcf,'plots/profiles_evolve.png','Resolution',600)
 
