@@ -139,7 +139,7 @@ for j = select_md
     % make time vector
     plot_t_expt = 0:0.1:size(expt_H_grid_mids, 2)/10-0.1;
     plot_t_ctrl = 0:0.1:size(ctrl_H_grid_mids, 2)/10-0.1;
-    % interpolate linearly to same time vector, wrt the expt
+    % interpolate linearly to same time vector
     ctrl_H_grid_mids = transpose(interp1(plot_t_ctrl, ctrl_H_grid_mids', plot_t_expt));
     gls_ctrl_c = interp1(plot_t_ctrl, gls_ctrl_c, plot_t_expt);
 

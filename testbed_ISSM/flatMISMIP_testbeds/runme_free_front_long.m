@@ -54,11 +54,13 @@ runtimeTbl = table('Size', tableSize, 'VariableTypes', varTypes, 'VariableNames'
 
 % time
 tic
-% start iteration
-% options: [4,5,6,10,11,12,16,17,18]%[1,2,3,7,8,9,13,14,15]%1:size(mdvar_combs,1)
-
 % model iteration
-for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
+
+% option 1: all deep glaciers:[4,5,6,10,11,12,16,17,18]
+% option 2: all shallow glaciers: [1,2,3,7,8,9,13,14,15]
+% option 3: all glaciers: 1:size(mdvar_combs,1)
+% option 4: Four deep end-member glaciers: [4,6,16,18]
+for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number)
 
     var_table = mdvar_combs(jj,:);
 
@@ -79,7 +81,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
     end
 
     % step iteration
-    for steps = 13:15
+    for steps = 13
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1620,7 +1622,11 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md = loadmodel(org, 'Transient_Calving_MassUnloading');
 
             % parameter regarding time
-            duration = 100; 
+            if ismember(jj, [16,18]) 
+                duration = 300; % slow flow speed, slow relaxation to new equilibrium
+            else 
+                duration = 200; 
+            end
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1662,7 +1668,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 4; % save every __ years
+            save_yr = 8; % save every __ years
             it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
@@ -1723,7 +1729,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md = loadmodel(org, pulse_gauss_mu_title);
 
             % parameter regarding time
-            duration = 100; 
+            duration = 200; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1765,7 +1771,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 4; % save every __ years
+            save_yr = 8; % save every __ years
             it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
@@ -1826,7 +1832,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md = loadmodel(org, diffu_gauss_mu_title);
 
             % parameter regarding time
-            duration = 100; 
+            duration = 200; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1868,7 +1874,7 @@ for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 4; % save every __ years
+            save_yr = 8; % save every __ years
             it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
