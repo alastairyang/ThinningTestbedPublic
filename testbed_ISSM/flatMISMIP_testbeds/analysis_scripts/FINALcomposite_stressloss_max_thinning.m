@@ -77,18 +77,19 @@ plot(t,lowK_front/1e3,'-k','LineWidth',2);hold off; % only one front is needed f
 ylabel('Front location (km)','FontSize',15)
 xline(21, ':k','LineWidth',1.2)
 xlim([0,26])
-set(gca,'YTick',46:2:58)
+set(gca,'YTick',48:4:58)
+set(gca,'Xtick',[])
+set(gca,'FontSize',14)
 
 nexttile
-yyaxis right
 plot(t,lowK_dH_pt,'-r','LineWidth',2);hold on;
 plot(t,highK_dH_pt,'-b','LineWidth',2); hold off;
 xline(21, ':k','LineWidth',1.2)
 xlim([0,26])
 set(gca,'YTick',-250:100:50)
 set(gca,'ycolor','k')
-yyaxis left
-set(gca,'YTick',[])
+set(gca,'Xtick',[])
+set(gca,'FontSize',14)
 
 nexttile
 plot(t,lowK_gl/1e3,':r','LineWidth',2);hold on;
@@ -97,7 +98,8 @@ ylabel('GL location (km)','FontSize',15)
 xline(21, ':k','LineWidth',1.2)
 xlim([0,26])
 xlabel('Year','FontSize',15)
-set(gca,'YTick',40:2:54)
+set(gca,'YTick',40:4:54)
+set(gca,'FontSize',14)
 % export
 exportgraphics(gcf,'plots/composite_stressloss/gl_front_ht.png','Resolution',600);
 
@@ -233,9 +235,16 @@ runme_params = readtable('runme_param.csv');
 front_x = runme_params.terminus0_x;
 % pre-allocate frontal resistive stress array
 frontal_Rs = zeros(2,n_simu);
+longi_later_ratio = zeros(2,n_simu);
 
+% Compare longitudinal resist. stress to lateral ~
+lvl_ratio = cellfun(@(x, y) x./y, longi_grad_all, later_grad_all, 'UniformOutput', false);
+
+%% Frontal stress loss
 % From the calculated stress components, we calculate the integrated
-% ...frontal resistive stress loss
+% ...frontal resistive stress loss. The 'front' is defined as the distance
+% from the last position of the grounding line to the initial position of
+% the calving front.
 for ri = 1:2 % run index: first expt, then control
     for j = 1:n_simu % simulations
         ti = sampled_ti(1);
@@ -243,19 +252,33 @@ for ri = 1:2 % run index: first expt, then control
         yi_mid = floor(size(basal_R_all{ri,ti,j},1)/2);
         sample_wid = floor(Ws_md(j)*0.6/ds/2);
         yi_central = yi_mid-sample_wid:yi_mid+sample_wid;
+        % get central flow trunk
         later_grad_central = later_grad_all{ri,ti,j}(yi_central,:);
+        % average over width
         later_grad_mid = mean(later_grad_central,1);
         basal_R_central = basal_R_all{ri,ti,j}(yi_mid,:);
         basal_R_mid = mean(basal_R_central,1);
 
-        % first timee step.
+        % longitudinal resistive
+        longi_grad_central = longi_grad_all{ri,ti,j}(yi_central,:);
+        longi_grad_mid = mean(longi_grad_central,1);
+
+        % first time step, however we use the final position of grounding
+        % line
         gl_x = gl_x_all{ri,sampled_ti(end),j};
-        front_x = front_x_all{ri,sampled_ti(end),j};
+        front_x = front_x_all{ri,sampled_ti(1),j};
         sample_xi = find(gl_x < x & x < front_x);
         % integrate with trapezoid method
-        later_int = trapz(later_grad_mid(sample_xi))*ds;
+        later_grad_mid_s = later_grad_mid(sample_xi);
+        later_grad_mid_s(isnan(later_grad_mid_s)) = 0.0;
+        later_int = trapz(later_grad_mid_s)*ds;
         basal_int = trapz(basal_R_mid(sample_xi))*ds;
-        total_R_ref = later_int+basal_int;
+
+        % longi
+        longi_grad_mid_s = longi_grad_mid(sample_xi);
+        longi_grad_mid_s(isnan(longi_grad_mid_s)) = 0.0;
+        longi_int = -1*trapz(longi_grad_mid_s)*ds;
+        total_R_ref = later_int + basal_int + longi_int;
 
         % same, but at the last time step
         ti = sampled_ti(end);
@@ -264,11 +287,25 @@ for ri = 1:2 % run index: first expt, then control
         sample_xi = find(gl_x < x & x < front_x);
         later_grad_sample = later_grad_mid(sample_xi);
         later_int = trapz(later_grad_sample)*ds;
-        total_R_last = later_int;
+
+        % longitudinal
+        longi_grad_mid_s = longi_grad_mid(sample_xi);
+        longi_grad_mid_s(isnan(longi_grad_mid_s)) = 0.0;
+        longi_int = -1*trapz(longi_grad_mid_s)*ds;
+
+        % no need to add basal resistive stress since it is the frontal
+        % region (all zero)
+        total_R_last = later_int + longi_int;
 
         % find the difference (stress loss!)
         frontal_Rs(ri,j) = total_R_ref - total_R_last;
         clear total_R_ref total_R_last
+
+        % longitudinal resist. stress to lateral ~ ratio in the front
+        ratio = lvl_ratio{ri,ti,j};
+        ratio_cfl = ratio(yi_mid,:);
+        longi_later_ratio(ri,j) = nanmean(ratio_cfl(sample_xi));
+
 
     end
 end
@@ -282,7 +319,7 @@ figure('Position',[100,100,350,700]);
 tiledlayout(2,1,'TileSpacing','compact')
 
 nexttile % GL retreat vs max thinning; stress loss vs max thinning
-% only for the three glaciers
+% only for the three narrow fjord glaciers
 lowK_i  = find((Ws_md == 5e3) + (FCs_md == 0.3e5) == 2);
 midK_i  = find((Ws_md == 5e3) + (FCs_md == 0.6e5) == 2);
 highK_i = find((Ws_md == 5e3) + (FCs_md == 1.2e5) == 2);
@@ -320,62 +357,6 @@ ax = gca;
 ax.FontSize = 14;
 exportgraphics(gcf,'plots/composite_stressloss/stressloss.png','Resolution',600);
 
-%% OUTDATED: Plotting maximum thinning and frontal resistive stress loss 
-Ws_symb = [40,100,260];
-GLs_symb = ["square","o"];
-FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
-figure('Position',[100,100,1100,600]);
-tiledlayout(1,3,'TileSpacing','compact')
+% Save a table of average lateral and longitudinal resistive stress
 
-nexttile % total thinning vs GL retreat
-for j = 1:n_simu
-    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
-    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
-    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
-    % plot the experiment
-    scatter(gl_expt(j)/1e3, dH_sum_expt(j),W_symb,FC_symb,'filled',GL_symb)
-    hold on
-    % plot the control
-    scatter(gl_ctrl(j)/1e3, dH_sum_ctrl(j), W_symb,FC_symb,GL_symb);
-    hold on
-end
-ylabel('Total thinning (m^2)')
-xlabel('Grounding line retreat (km)')
-ax = gca;
-ax.FontSize = 14;
-ax.FontName = 'Aria';
 
-nexttile % Max thinning vs GL retreat
-for j = 1:n_simu
-    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
-    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
-    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
-    % plot the experiment
-    scatter(gl_expt(j)/1e3, dH_max_expt(j), W_symb,FC_symb,'filled',GL_symb)
-    hold on
-    % plot the control
-    scatter(gl_ctrl(j)/1e3, dH_max_ctrl(j), W_symb,FC_symb,GL_symb);
-    hold on
-end
-ylabel('Maximum thinning (m)')
-xlabel('Grounding line retreat (km)')
-set(gca,'XTick',[2,6,10,14]);
-ax = gca; ax.FontSize = 14; ax.FontName = 'Aria';
-
-nexttile % Total stress loss vs max thinning
-for j = 1:n_simu
-    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
-    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
-    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
-    % plot the experiment
-    scatter(frontal_Rs(1,j)/1e9, dH_max_expt(j), W_symb,FC_symb,'filled',GL_symb)
-    hold on
-    % plot the control
-    scatter(frontal_Rs(2,j)/1e9, dH_max_ctrl(j), W_symb,FC_symb,GL_symb);
-    hold on
-end
-ylabel('Maximum thinning (m)','FontName','Aria','FontSize',14)
-xlabel('Total resistive stress loss (GPa m)','FontName','Aria','FontSize',14)
-ax = gca; ax.FontSize = 14; ax.FontName = 'Aria';
-
-exportgraphics(gcf,'plots/two_thinning_proxies.png','Resolution',600)

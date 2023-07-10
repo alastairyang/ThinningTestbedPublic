@@ -81,7 +81,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
     end
 
     % step iteration
-    for steps = 13
+    for steps = [14,15]
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1621,12 +1621,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
         if perform(org, 'Transient_MassUnloading_Extended')% {{{1 STEP 13
             md = loadmodel(org, 'Transient_Calving_MassUnloading');
 
-            % parameter regarding time
-            if ismember(jj, [16,18]) 
-                duration = 300; % slow flow speed, slow relaxation to new equilibrium
-            else 
-                duration = 200; 
-            end
+            duration = 150; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1729,7 +1724,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             md = loadmodel(org, pulse_gauss_mu_title);
 
             % parameter regarding time
-            duration = 200; 
+            duration = 150; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1832,7 +1827,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             md = loadmodel(org, diffu_gauss_mu_title);
 
             % parameter regarding time
-            duration = 200; 
+            duration = 150; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
