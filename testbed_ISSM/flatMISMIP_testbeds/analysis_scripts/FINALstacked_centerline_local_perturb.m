@@ -68,7 +68,7 @@ extended_idx = [1,3,7,9];
 
 %% Loading the models and processing
 n_simu = size(folder_dir_groups{geom_i}, 1); % number of simulation in each group
-for j = 3
+for j = extended_idx
     % read the model
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
     md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
@@ -114,35 +114,45 @@ for j = 3
     % crop grounding line vector as well
     gls_expt_c = gls_expt(start_t/dt+1:end);
     front_c = front(start_t/dt+1:end);
+    gls_diff_c = gls_diff(start_t/dt+1:end);
 
     % data for plotting
-    plot_t = 0:0.1:size(md_grid_mids, 2)/10-0.1;
+    plot_t = 0:0.1:size(md_grid_mids, 2)/10-0.1; last_t = plot_t(end);
     plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
+    fake_t_end = 26;
     if ismember(j, extended_idx)
         md_ctrl_extend = load([group.folder{j},'/', group.name{j}, '/', ctrl_extend_name]).md;
         md_expt_extend = load([group.folder{j},'/', group.name{j}, '/', expt_extend_name]).md;
         [rel_GL_extend, front_extend, dH_extend, t_extend, ~, ~, gls_expt_extend] = checkNewSS(md_ctrl_extend, md_expt_extend, ds);
         % concatenate to the main data array
-        plot_t = [plot_t, t_extend];
-        gls_diff = [gls_diff; rel_GL_extend'];
-        gls_expt_c = [gls_expt_c; gls_expt_extend];
-        front_c = [front_c; front_extend];
+        fake_t_extend = linspace(plot_t(end),fake_t_end,length(t_extend));
+        fake_t_extend = fake_t_extend(2:end);
+        plot_t = [plot_t, fake_t_extend];
+        gls_diff_c = [gls_diff_c; rel_GL_extend(2:end)];
+        gls_expt_c = [gls_expt_c; gls_expt_extend(2:end)];
+        front_c = [front_c; front_extend(2:end)];
         md_grid_mids = [md_grid_mids, dH_extend(x<=runme_params.terminus0_x,:)];
     end
         
-
     % Create the figure (one for each glacier; save all in a folder)
-    ff = figure('Position',[100,100,700,600]);
+    figure('Position',[100,100,700,600]);
     imagesc(plot_t, plot_x, md_grid_mids, 'AlphaData',~isnan(md_grid_mids)); hold on
-    hax = gca; hax.YTickLabel = flipud(hax.YTickLabel);
-    set(gca,'YTick',[20,30,40,50])
+    %hax = gca; hax.YTickLabel = flipud(hax.YTickLabel);
+    yticks_val = [16.5, 26.5, 36.5, 46.5]; set(gca,'YTick',yticks_val);
+    set(gca,'YTickLabel',string(runme_params.terminus0_x/1e3 - yticks_val))
     ylabel('Distance to front (km)','FontName','Aria','FontSize',18)
     % add grounding line and calving front
     plot(plot_t, gls_expt_c/1000,'-k','LineWidth',1.2); hold on
     plot(plot_t, front_c/1000, '-.k','LineWidth',1.2); hold on
     % add the end-of-perturbation dashline
-    xline(16,':k','LineWidth',1.2); hold off
+    xline(16,':k','LineWidth',1.2); hold on
+    xline(last_t,':k','LineWidth',2.4); hold off
     ax = gca; ax.FontSize = 18;
+    xticks_p1 = 0:2:21; xticks_p2 = 22:fake_t_end;
+    xticks = [xticks_p1, xticks_p2];
+    fake_t_extend_labels = floor(interp1(fake_t_extend, t_extend(2:end), xticks_p2));
+    TickLabels = [string(xticks_p1) string(fake_t_extend_labels)];
+    set(gca,'XTick',xticks); set(gca,'XTickLabel',TickLabels)
     
     % add pulse timeseries plot
     switch pulse_type
@@ -160,15 +170,15 @@ for j = 3
     % plot the grounding line as an inset
     p = get(gca, 'Position');
     inset_y = 0.2;
-    pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3) p(4)*inset_y]);
+    pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3)*(last_t/26) p(4)*inset_y*0.87]);
     plot_gl_t = t_ctrl - t_ctrl(1);
     yyaxis left
     % ...as an anomaly plot
     anomaly(plot_gl_t(start_t/dt+1:end)-plot_gl_t(start_t/dt+1), gls_diff(start_t/dt+1:end))
     hold on;
     set(gca, 'YDir','reverse')
-    xlim([0, end_t-5]); ylabel('GL(m)','FontName','Aria','FontSize',18)
-    xlabel('Time (yr)','FontName','Aria')
+    xlim([0, end_t-5]); ylabel('GL(m)','FontSize',18)
+    xlabel('Time (yr)','FontSize',16)
     % add pulse
     yyaxis right
     dtt = 0.01;
@@ -262,7 +272,7 @@ function [rel_GL, front, dH, t_plot, x, y, gls_expt] = checkNewSS(md_ctrl, md_ex
     front = zeros(size(ctrl.time));
     for i = 1:length(expt.time); gls_expt(i) = locate_groundingline(md_expt, md_expt.results.TransientSolution(i).MaskOceanLevelset); end
     for i = 1:length(ctrl.time); gls_ctrl(i) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset); end
-    for i = 1:length(ctrl.time); front(i) = locate_calvingfront(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset); end
+    for i = 1:length(ctrl.time); front(i) = locate_calvingfront(md_ctrl, md_ctrl.results.TransientSolution(i).MaskIceLevelset); end
 
     % find which simulation is shorter
     if ctrl.time(end) < expt.time(end)
@@ -273,13 +283,13 @@ function [rel_GL, front, dH, t_plot, x, y, gls_expt] = checkNewSS(md_ctrl, md_ex
         % mask out non-ice part
         [mask_grid, x, y] = mesh_to_grid_overtime(elements, md_ctrl.mesh.x, md_ctrl.mesh.y, ctrl.MaskIceLevelset, ds);
         md_grid(mask_grid>0) = nan;
-        md_grid = permute(md_grid,[2,3,1]);
+        dH = permute(md_grid,[2,3,1]);
 
         % relative grounding line
         gls_expt = interp1(expt.time, gls_expt, ctrl.time);
         rel_GL = gls_expt - gls_ctrl;
 
-        t = ctrl.time;
+        t = ctrl.time - ctrl.time(1);
 
     else % expt has a shorter simulation time span
         ctrl_H_interp = transpose(interp1(ctrl.time, [ctrl.Thickness{:}]', expt.time));
@@ -297,7 +307,7 @@ function [rel_GL, front, dH, t_plot, x, y, gls_expt] = checkNewSS(md_ctrl, md_ex
         % front
         front = interp1(ctrl.time, front, expt.time);
 
-        t = expt.time;
+        t = expt.time - expt.time(1);
 
     end
 
@@ -305,19 +315,29 @@ function [rel_GL, front, dH, t_plot, x, y, gls_expt] = checkNewSS(md_ctrl, md_ex
     mid_i = floor(size(dH,1)/2);
     dH_mids = squeeze(dH(mid_i,:,:));
     % when the thickness change stops
-    max_H = max(abs(dH_mids), [], 1);
-    max_dHdt = transpose((max_H(2:end) - max_H(1:end-1)))./(t(2:end)-t(1:end-1));
+%     max_H = max(abs(dH_mids), [], 1);
+%     max_dHdt = transpose((max_H(2:end) - max_H(1:end-1)))./(t(2:end)-t(1:end-1));
     % when the relative GL stops moving
-    rel_GL_rate = (rel_GL(2:end)-rel_GL(1:end-1))./(t(2:end)-t(1:end-1));
-    idx_dH = find(abs(max_dHdt)<dH_tol,1,'first');
-    idx_GL = find(abs(rel_GL_rate)<dGL_tol,1,'first');
-    idx = max([idx_dH, idx_GL]);
-    t_stop = t(idx); t_plot = t_stop:dt:t_stop+t_window;
-    if t_plot(end)>t(end); error('The plot time exceeds simulation time!'); end
+    %rel_GL_rate = (rel_GL(2:end)-rel_GL(1:end-1))./(t(2:end)-t(1:end-1));
+    expt_GL_rate = (gls_expt(2:end) - gls_expt(1:end-1))./(t(2:end)-t(1:end-1));
+%     idx_dH      = find(abs(max_dHdt)<dH_tol,1,'first');
+    %idx_rel_GL  = find(abs(rel_GL_rate)<dGL_tol,1,'first');
+    idx = find(abs(expt_GL_rate)<dGL_tol,1,'first');
+    
+%    idx = max([idx_dH, idx_rel_GL, idx_expt_GL]);
+    if isempty(idx) 
+        warning('No steady state reached!');
+        t_stop = t(end)-50;
+    else
+        t_stop = t(idx); 
+    end
+    t_plot = t_stop:dt:t_stop+t_window;
 
     % interpolate dH and relative GL at plus minus 5 years around this time
-    dH = transpose(interp1(t, dH_mids', t_plot));
-    rel_GL = interp1(t, rel_GL, t_plot);
+    dH       = transpose(interp1(t, dH_mids', t_plot));
+    rel_GL   = interp1(t, rel_GL, t_plot');
+    gls_expt = interp1(t,gls_expt, t_plot');
+    front    = interp1(t, front, t_plot');
 
     
 end
