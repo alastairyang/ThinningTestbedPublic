@@ -57,15 +57,19 @@ switch expt_type
     case 'mu'
         ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
         expt_name = ['MISMIP_yangTransient_Calving_MassUnloading_',pulse_type,'GaussianPerturb_8.mat'];
+        ctrl_extend_name = 'MISMIP_yangTransient_MassUnloading_Extended.mat';
+        expt_extend_name = ['MISMIP_yangTransient_LocalPerturb_',pulse_type,'_Extended.mat'];
     otherwise
         error('Unknown experiment type!')
 end
 
+group = folder_dir_groups{geom_i};
+extended_idx = [1,3,7,9];
+
 %% Loading the models and processing
 n_simu = size(folder_dir_groups{geom_i}, 1); % number of simulation in each group
-for j = 1:n_simu
+for j = 3
     % read the model
-    group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
     md_expt = load([group.folder{j},'/', group.name{j}, '/', expt_name]).md;
     results_tbl_expt = struct2table(md_expt.results.TransientSolution);
@@ -74,8 +78,8 @@ for j = 1:n_simu
     modelname = md_ctrl.miscellaneous.name;
     [W, GL, FC] = parse_modelname(modelname); % width, GL depths, and sliding law coefficient
     % isolate the delta H from localized basal perturbation
-    expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Surface{:}]', results_tbl_ctrl.time,'linear','extrap'));
-    deltaH = expt_H_interp - [results_tbl_ctrl.Surface{:}];
+    expt_H_interp = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
+    deltaH = expt_H_interp - [results_tbl_ctrl.Thickness{:}];
     deltaH_cell = num2cell(deltaH,1);
     [md_grid, x, y] = mesh_to_grid_overtime(md_ctrl.mesh.elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, ds);
     % mask out non-ice part
@@ -83,7 +87,7 @@ for j = 1:n_simu
     md_grid(mask_grid>0) = nan;
     md_grid = permute(md_grid,[2,3,1]);
 
-    % retrieve grounding line and calving front
+    %retrieve grounding line and calving front
     t_expt = results_tbl_expt.time;
     t_ctrl = results_tbl_ctrl.time;
     gls_expt = zeros(size(t_expt));
@@ -111,10 +115,24 @@ for j = 1:n_simu
     gls_expt_c = gls_expt(start_t/dt+1:end);
     front_c = front(start_t/dt+1:end);
 
-    % Create the figure (one for each glacier; save all in a folder)
-    ff = figure('Position',[100,100,700,600]);
+    % data for plotting
     plot_t = 0:0.1:size(md_grid_mids, 2)/10-0.1;
     plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
+    if ismember(j, extended_idx)
+        md_ctrl_extend = load([group.folder{j},'/', group.name{j}, '/', ctrl_extend_name]).md;
+        md_expt_extend = load([group.folder{j},'/', group.name{j}, '/', expt_extend_name]).md;
+        [rel_GL_extend, front_extend, dH_extend, t_extend, ~, ~, gls_expt_extend] = checkNewSS(md_ctrl_extend, md_expt_extend, ds);
+        % concatenate to the main data array
+        plot_t = [plot_t, t_extend];
+        gls_diff = [gls_diff; rel_GL_extend'];
+        gls_expt_c = [gls_expt_c; gls_expt_extend];
+        front_c = [front_c; front_extend];
+        md_grid_mids = [md_grid_mids, dH_extend(x<=runme_params.terminus0_x,:)];
+    end
+        
+
+    % Create the figure (one for each glacier; save all in a folder)
+    ff = figure('Position',[100,100,700,600]);
     imagesc(plot_t, plot_x, md_grid_mids, 'AlphaData',~isnan(md_grid_mids)); hold on
     hax = gca; hax.YTickLabel = flipud(hax.YTickLabel);
     set(gca,'YTick',[20,30,40,50])
@@ -181,3 +199,125 @@ exportgraphics(gcf,'plots/colorbar_m10_p10.png','Resolution',600)
 figure;
 imagesc(0*rand(10,10));clim([-5,5]);colormap(diverg_colormap(50)); colorbar
 exportgraphics(gcf,'plots/colorbar_m5_p5.png','Resolution',600)
+
+%% Get extended data
+[rel_GL_extend, front_extend, dH_extend, t_extend, x, y, gls_expt] = checkNewSS(md_ctrl_extend, md_expt_extend, ds);
+
+
+% make Hovemoller
+ff = figure('Position',[100,100,700,600]);
+plot_t = t_extend;
+plot_x = x/1000; % in km
+imagesc(plot_t, plot_x, dH_extend, 'AlphaData',~isnan(dH_extend)); hold on
+hax = gca; hax.YTickLabel = flipud(hax.YTickLabel);
+set(gca,'YTick',[20,30,40,50])
+ylabel('Distance to front (km)','FontName','Aria','FontSize',18)
+colormap(diverg_colormap(50)); clim([-5,5])
+
+%% plot the grounding line as an inset
+p = get(gca, 'Position');
+inset_y = 0.2;
+pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3) p(4)*inset_y]);
+plot_gl_t = t_ctrl - t_ctrl(1);
+yyaxis left
+% ...as an anomaly plot
+anomaly(plot_gl_t(start_t/dt+1:end)-plot_gl_t(start_t/dt+1), gls_diff(start_t/dt+1:end))
+hold on;
+set(gca, 'YDir','reverse')
+xlim([0, end_t-5]); ylabel('GL(m)','FontName','Aria','FontSize',18)
+xlabel('Time (yr)','FontName','Aria')
+% add pulse
+yyaxis right
+dtt = 0.01;
+pulse_t = pulse_t(start_t/dtt+1:end) - pulse_t(start_t/dtt+1);
+pulse = pulse(start_t/dtt+1:end);
+plot(pulse_t, pulse,'k','LineWidth',2);
+switch pulse_type; case "Diffu"; ylim([0,0.2]); case "Pulse"; ylim([0,1]);otherwise; error('Unknown type');end
+set(gca,'Ytick',[])
+ax = gca;
+ax.YAxis(1).Color = 'k';
+ax.FontSize = 18;
+% add the end-of-perturbation dashline
+xline(16,':k','LineWidth',1.2); hold off
+
+%% Appendix: functions
+function [rel_GL, front, dH, t_plot, x, y, gls_expt] = checkNewSS(md_ctrl, md_expt, ds)
+% CheckNewSS: Check when new steady state is reached (thickness change approaching zero)
+% after the perturbation stops.
+
+    % parameter
+    dH_tol = 0.05; % m/a
+    dGL_tol = 1; %  m/a
+    t_window = 50;
+    dt = 1; 
+
+    % main
+    expt = struct2table(md_expt.results.TransientSolution);
+    ctrl = struct2table(md_ctrl.results.TransientSolution);
+    elements = md_ctrl.mesh.elements;
+
+    % relative grounding line
+    gls_expt = zeros(size(expt.time));
+    gls_ctrl = zeros(size(ctrl.time));
+    front = zeros(size(ctrl.time));
+    for i = 1:length(expt.time); gls_expt(i) = locate_groundingline(md_expt, md_expt.results.TransientSolution(i).MaskOceanLevelset); end
+    for i = 1:length(ctrl.time); gls_ctrl(i) = locate_groundingline(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset); end
+    for i = 1:length(ctrl.time); front(i) = locate_calvingfront(md_ctrl, md_ctrl.results.TransientSolution(i).MaskOceanLevelset); end
+
+    % find which simulation is shorter
+    if ctrl.time(end) < expt.time(end)
+        expt_H_interp = transpose(interp1(expt.time, [expt.Thickness{:}]', ctrl.time));
+        deltaH = expt_H_interp - [ctrl.Thickness{:}];
+        deltaH_cell = num2cell(deltaH,1);
+        [md_grid, ~, ~] = mesh_to_grid_overtime(elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, ds);
+        % mask out non-ice part
+        [mask_grid, x, y] = mesh_to_grid_overtime(elements, md_ctrl.mesh.x, md_ctrl.mesh.y, ctrl.MaskIceLevelset, ds);
+        md_grid(mask_grid>0) = nan;
+        md_grid = permute(md_grid,[2,3,1]);
+
+        % relative grounding line
+        gls_expt = interp1(expt.time, gls_expt, ctrl.time);
+        rel_GL = gls_expt - gls_ctrl;
+
+        t = ctrl.time;
+
+    else % expt has a shorter simulation time span
+        ctrl_H_interp = transpose(interp1(ctrl.time, [ctrl.Thickness{:}]', expt.time));
+        deltaH = [expt.Thickness{:}] - ctrl_H_interp;
+        deltaH_cell = num2cell(deltaH,1);
+        [md_grid, x, y] = mesh_to_grid_overtime(elements, md_ctrl.mesh.x, md_ctrl.mesh.y, deltaH_cell, ds);
+        % mask out non-ice part
+        [mask_grid, ~, ~] = mesh_to_grid_overtime(elements, md_ctrl.mesh.x, md_ctrl.mesh.y, expt.MaskIceLevelset, ds);
+        md_grid(mask_grid>0) = nan;
+        dH = permute(md_grid,[2,3,1]);
+
+        % relative grounding line
+        gls_ctrl = interp1(ctrl.time, gls_ctrl, expt.time);
+        rel_GL = gls_expt - gls_ctrl;
+        % front
+        front = interp1(ctrl.time, front, expt.time);
+
+        t = expt.time;
+
+    end
+
+    % get center flow line data
+    mid_i = floor(size(dH,1)/2);
+    dH_mids = squeeze(dH(mid_i,:,:));
+    % when the thickness change stops
+    max_H = max(abs(dH_mids), [], 1);
+    max_dHdt = transpose((max_H(2:end) - max_H(1:end-1)))./(t(2:end)-t(1:end-1));
+    % when the relative GL stops moving
+    rel_GL_rate = (rel_GL(2:end)-rel_GL(1:end-1))./(t(2:end)-t(1:end-1));
+    idx_dH = find(abs(max_dHdt)<dH_tol,1,'first');
+    idx_GL = find(abs(rel_GL_rate)<dGL_tol,1,'first');
+    idx = max([idx_dH, idx_GL]);
+    t_stop = t(idx); t_plot = t_stop:dt:t_stop+t_window;
+    if t_plot(end)>t(end); error('The plot time exceeds simulation time!'); end
+
+    % interpolate dH and relative GL at plus minus 5 years around this time
+    dH = transpose(interp1(t, dH_mids', t_plot));
+    rel_GL = interp1(t, rel_GL, t_plot);
+
+    
+end

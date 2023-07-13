@@ -315,10 +315,92 @@ Ws_symb = [40,100,260];
 GLs_symb = ["square","o"];
 FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
 % create figure
-figure('Position',[100,100,350,700]);
-tiledlayout(2,1,'TileSpacing','compact')
+figure('Position',[100,100,900,400]);
+tiledlayout(2,2,'TileSpacing','loose')
 
 nexttile % GL retreat vs max thinning; stress loss vs max thinning
+% % only for the three narrow fjord glaciers
+% lowK_i  = find((Ws_md == 5e3) + (FCs_md == 0.3e5) == 2);
+% midK_i  = find((Ws_md == 5e3) + (FCs_md == 0.6e5) == 2);
+% highK_i = find((Ws_md == 5e3) + (FCs_md == 1.2e5) == 2);
+% % plot stress loss vs max dH
+% yyaxis left
+% scatter(dH_max_expt(lowK_i), frontal_Rs(1,lowK_i)/1e6, 200, FCs_symb(1,:), 'filled'); hold on
+% scatter(dH_max_expt(midK_i), frontal_Rs(1,midK_i)/1e6, 200, FCs_symb(2,:), 'filled'); hold on
+% scatter(dH_max_expt(highK_i), frontal_Rs(1,highK_i)/1e6, 200, FCs_symb(3,:), 'filled'); hold on
+% ylabel('Frontal sress loss (MPa m)','FontSize',14)
+% set(gca,'ycolor','k') 
+% % plot GL vs max dH
+% yyaxis right
+% scatter(dH_max_expt(lowK_i), gl_expt(lowK_i)/1e3, 200, FCs_symb(1,:),'filled','Marker','diamond'); hold on
+% scatter(dH_max_expt(midK_i), gl_expt(midK_i)/1e3, 200, FCs_symb(2,:),'filled','Marker','diamond'); hold on
+% scatter(dH_max_expt(highK_i), gl_expt(highK_i)/1e3, 200, FCs_symb(3,:),'filled','Marker','diamond'); hold on
+% ylabel('Grounding line retreat (km)','FontSize',14)
+% xlabel('Maximum thinning (m)','FontSize',14)
+% set(gca,'ycolor','k') 
+for j = 1:n_simu
+    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
+    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
+    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
+    % plot frontal resistive stress loss vs max thinning
+    yyaxis left
+    scatter(dH_max_expt(j),frontal_Rs(1,j)/1e6, W_symb,FC_symb,'filled',GL_symb); hold on
+    yyaxis right
+    % plot grounding line vs max thinning
+    scatter(dH_max_expt(j),gl_expt(j)/1e3,W_symb,FC_symb,'^');  hold on
+end
+%xlabel('Max thinning (m^2)')
+yyaxis left;  %ylabel('Frontal sress loss (MPa m)'); 
+set(gca,'ycolor','k');
+set(gca,'YTick',[2000:2000:9000])
+yyaxis right; %ylabel('Grounding line retreat (km)');
+set(gca,'ycolor','k');
+ax = gca;
+ax.FontSize = 14;
+% add linear regression and the fitted line
+yyaxis left
+xlims = get(gca,'XLim');
+lm_RH = fitlm(dH_max_expt, frontal_Rs(1,:)/1e6);
+r_squared_RH = lm_RH.Rsquared.Ordinary;
+line_RH = lm_RH.Coefficients.Estimate(2)*[xlims(1):xlims(2)*0.01:xlims(2)] + lm_RH.Coefficients.Estimate(1);
+plot(xlims(1):xlims(2)*0.01:xlims(2), line_RH, '-r','LineWidth',1.2); hold on;
+
+yyaxis right
+lm_GH = fitlm(dH_max_expt, gl_expt/1e3);
+r_squared_GH = lm_GH.Rsquared.Ordinary;
+line_GH = lm_GH.Coefficients.Estimate(2)*[xlims(1):xlims(2)*0.01:xlims(2)] + lm_GH.Coefficients.Estimate(1);
+plot(xlims(1):xlims(2)*0.01:xlims(2), line_GH, ':r','LineWidth',1.2); hold on;
+
+nexttile([2,1]) % total thinning vs GL retreat
+for j = 1:n_simu
+    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
+    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
+    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
+    % plot the experiment
+    yyaxis right
+    scatter(dH_sum_expt(j),gl_expt(j)/1e3, W_symb,FC_symb,'filled','Marker','^')
+    hold on
+    % plot the control
+    %scatter(dH_sum_ctrl(j), gl_ctrl(j)/1e3,W_symb,FC_symb,GL_symb);
+    hold on
+end
+xlabel('Total thinning (m^2)')
+ylabel('Grounding line retreat (km)')
+ax = gca;
+ax.FontSize = 14;
+set(gca,'ycolor','k')
+yyaxis left; set(gca,'YTick',[]);
+
+xlims = get(gca,'XLim');
+lm_GHtot = fitlm(dH_sum_expt, gl_expt/1e3);
+r_squared_GHtot = lm_GHtot.Rsquared.Ordinary;
+line_GHtot = lm_GHtot.Coefficients.Estimate(2)*[xlims(1):xlims(2)*0.01:xlims(2)] + lm_GHtot.Coefficients.Estimate(1);
+plot(xlims(1):xlims(2)*0.01:xlims(2), line_GHtot, '-r','LineWidth',1.2); hold on;
+
+nexttile
+% % draw inset box in the bottom right
+% p = get(gca, 'Position');
+% pp = axes('Parent', gcf, 'Position', [p(1)+0.4 p(2)+0.04 p(3)*0.3 p(4)*0.3]);
 % only for the three narrow fjord glaciers
 lowK_i  = find((Ws_md == 5e3) + (FCs_md == 0.3e5) == 2);
 midK_i  = find((Ws_md == 5e3) + (FCs_md == 0.6e5) == 2);
@@ -327,34 +409,25 @@ highK_i = find((Ws_md == 5e3) + (FCs_md == 1.2e5) == 2);
 yyaxis left
 scatter(dH_max_expt(lowK_i), frontal_Rs(1,lowK_i)/1e6, 200, FCs_symb(1,:), 'filled'); hold on
 scatter(dH_max_expt(midK_i), frontal_Rs(1,midK_i)/1e6, 200, FCs_symb(2,:), 'filled'); hold on
-scatter(dH_max_expt(highK_i), frontal_Rs(1,highK_i)/1e6, 200, FCs_symb(3,:), 'filled'); hold on
-ylabel('Frontal sress loss (MPa m)','FontSize',14)
+scatter(dH_max_expt(highK_i), frontal_Rs(1,highK_i)/1e6,200, FCs_symb(3,:), 'filled'); hold on
 set(gca,'ycolor','k') 
-% plot GL vs max dH
-yyaxis right
-scatter(dH_max_expt(lowK_i), gl_expt(lowK_i)/1e3, 200, FCs_symb(1,:),'filled','Marker','diamond'); hold on
-scatter(dH_max_expt(midK_i), gl_expt(midK_i)/1e3, 200, FCs_symb(2,:),'filled','Marker','diamond'); hold on
-scatter(dH_max_expt(highK_i), gl_expt(highK_i)/1e3, 200, FCs_symb(3,:),'filled','Marker','diamond'); hold on
-ylabel('Grounding line retreat (km)','FontSize',14)
-xlabel('Maximum thinning (m)','FontSize',14)
-set(gca,'ycolor','k') 
-
-nexttile % total thinning vs GL retreat
-for j = 1:n_simu
-    W_symb = Ws_symb(Ws_md(j)==Ws); % marker size
-    GL_symb = GLs_symb(GLs_md(j)==GLs); % marker type (square is shallow; circle is deep)
-    FC_symb = FCs_symb(FCs_md(j)==FCs,:); % color
-    % plot the experiment
-    scatter(dH_sum_expt(j),gl_expt(j)/1e3, W_symb,FC_symb,'filled',GL_symb)
-    hold on
-    % plot the control
-    scatter(dH_sum_ctrl(j), gl_ctrl(j)/1e3,W_symb,FC_symb,GL_symb);
-    hold on
-end
-xlabel('Total thinning (m^2)')
-ylabel('Grounding line retreat (km)')
+set(gca,'YTick',[5e3,7e3,9e3])
+%ylabel('Frontal sress loss (MPa m)'); set(gca,'ycolor','k');
 ax = gca;
 ax.FontSize = 14;
+% plot GL vs max dH
+yyaxis right
+scatter(dH_max_expt(lowK_i), gl_expt(lowK_i)/1e3, 200, FCs_symb(1,:),'Marker','^'); hold on
+scatter(dH_max_expt(midK_i), gl_expt(midK_i)/1e3, 200, FCs_symb(2,:),'Marker','^'); hold on
+scatter(dH_max_expt(highK_i), gl_expt(highK_i)/1e3,200, FCs_symb(3,:),'Marker','^'); hold on
+set(gca,'ycolor','k')
+set(gca,'YTick',[11,12,13])
+xlabel('Max thinning (m^2)')
+%ylabel('Grounding line retreat (km)');set(gca,'ycolor','k');
+ax = gca;
+ax.FontSize = 14;
+
+
 exportgraphics(gcf,'plots/composite_stressloss/stressloss.png','Resolution',600);
 
 % Save a table of average lateral and longitudinal resistive stress
