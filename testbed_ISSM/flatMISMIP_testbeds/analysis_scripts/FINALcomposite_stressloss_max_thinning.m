@@ -352,7 +352,7 @@ end
 %xlabel('Max thinning (m^2)')
 yyaxis left;  %ylabel('Frontal sress loss (MPa m)'); 
 set(gca,'ycolor','k');
-set(gca,'YTick',[2000:2000:9000])
+set(gca,'YTick',2000:2000:9000)
 yyaxis right; %ylabel('Grounding line retreat (km)');
 set(gca,'ycolor','k');
 ax = gca;
@@ -422,7 +422,7 @@ scatter(dH_max_expt(midK_i), gl_expt(midK_i)/1e3, 200, FCs_symb(2,:),'Marker','^
 scatter(dH_max_expt(highK_i), gl_expt(highK_i)/1e3,200, FCs_symb(3,:),'Marker','^'); hold on
 set(gca,'ycolor','k')
 set(gca,'YTick',[11,12,13])
-xlabel('Max thinning (m^2)')
+xlabel('Max thinning (m)')
 %ylabel('Grounding line retreat (km)');set(gca,'ycolor','k');
 ax = gca;
 ax.FontSize = 14;

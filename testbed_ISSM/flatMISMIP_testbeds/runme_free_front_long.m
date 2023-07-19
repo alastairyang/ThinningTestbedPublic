@@ -59,8 +59,8 @@ tic
 % option 1: all deep glaciers:[4,5,6,10,11,12,16,17,18]
 % option 2: all shallow glaciers: [1,2,3,7,8,9,13,14,15]
 % option 3: all glaciers: 1:size(mdvar_combs,1)
-% option 4: Four deep end-member glaciers: [4,6,16,18]
-for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number)
+% option 4: Four deep glaicer endmembers: [4,6,16,18]
+for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
 
     var_table = mdvar_combs(jj,:);
 
@@ -81,7 +81,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
     end
 
     % step iteration
-    for steps = [14,15]
+    for steps = 15
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1130,7 +1130,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 % and then assimilate into md.friction.C
             end
 
-            %% Mass unloading
+            %% Ice overburden pressure change
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
@@ -1170,7 +1170,6 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 md.timestepping.final_time = md.timestepping.start_time + gauss_timestep;
                 md.settings.output_frequency = 1;
 
-                % calculate new fric coef
                 % calculate new fric coef
                 if it == 1 % initial condition: delta(H) = 0
                     deltaH = mu_time_mask_interp(it)*zeros(size(md.geometry.thickness));
@@ -1651,7 +1650,8 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
-            C0 = md.friction.C(1:end-1,end);
+            [~,old_C_idx] = min(abs(next_start_time - md.friction.C(end,:)));
+            C0 = md.friction.C(1:end-1,old_C_idx);
             H0 = md.results.TransientSolution(end).Thickness;
             Zb = md.results.TransientSolution(end).Base;
             k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
@@ -1724,7 +1724,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             md = loadmodel(org, pulse_gauss_mu_title);
 
             % parameter regarding time
-            duration = 150; 
+            duration = 20; 
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1754,7 +1754,10 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
-            C0 = md.friction.C(1:end-1,end);
+            % the starting friction.C should use the one in old
+            % friction.C array with matching timestamp
+            [~,old_C_idx] = min(abs(next_start_time - md.friction.C(end,:)));
+            C0 = md.friction.C(1:end-1,old_C_idx);
             H0 = md.results.TransientSolution(end).Thickness;
             Zb = md.results.TransientSolution(end).Base;
             k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
@@ -1827,6 +1830,111 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             md = loadmodel(org, diffu_gauss_mu_title);
 
             % parameter regarding time
+            duration = 20; 
+
+            start_time = md.timestepping.final_time;
+            md.timestepping = timestepping(); 
+            md.timestepping.start_time = start_time;
+            dt_mu = 0.1; % mass unloading update dt
+            %dt_calve = 1; % calving front position update dt
+
+            % simulation config
+            np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
+            cluster = generic('name', oshostname(), 'np', np);
+            md.cluster = cluster;
+            % relax max iteration
+            md.stressbalance.maxiter=100;
+            % do not interpolate forcing
+            md.timestepping.interp_forcing = 0;
+            
+            %% Mass unloading
+            % save previous fields separately
+            % this step help re-assembles all results later easily
+            md_temp = transientrestart(md);
+            %previous_results = md_temp.results;
+            next_start_time = md_temp.timestepping.start_time;
+            clear md_temp
+            
+            % initialize
+            new_results = [];
+            % get the equivalent coefficients if using Budd sliding law
+            law_from = 'Weertman';
+            law_to = 'Budd';
+            [~,old_C_idx] = min(abs(next_start_time - md.friction.C(end,:)));
+            C0 = md.friction.C(1:end-1,old_C_idx);
+            H0 = md.results.TransientSolution(end).Thickness;
+            Zb = md.results.TransientSolution(end).Base;
+            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
+
+            % add an initial time to the friction coef vector
+            md.friction.C = [C0; next_start_time];
+
+            % No extra model output request
+            md.stressbalance.requested_outputs={'default'};
+
+            % time steps where we save the results
+            save_yr = 8; % save every __ years
+            it_save = 1:(save_yr/dt_mu):duration/dt_mu;
+            for it = 1:duration/dt_mu            
+
+                results = md.results.TransientSolution;
+                % restart and specify sim duration
+                md = transientrestart(md);
+                md.timestepping.time_step = 0.01;
+                md.timestepping.final_time = md.timestepping.start_time + dt_mu;
+                md.settings.output_frequency = dt_mu/md.timestepping.time_step;
+
+                % calculate new fric coef
+                if it == 1 % initial condition: delta(H) = 0
+                    deltaH = zeros(size(md.geometry.thickness));
+                    Hi = H0 + deltaH;
+                    C = C0;
+                else
+                    deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
+                    Hi = H0 + deltaH;
+                end
+                ocean_mask = results(end).MaskOceanLevelset;
+                C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
+                % append time and assign
+                current_time = md.timestepping.start_time;
+                C_add_time = [C; current_time + dt_mu];
+                md.friction.C = [md.friction.C, C_add_time];
+
+                % solve
+                md = solve(md,'tr');
+
+                % concatenate results for every 2 years
+                if ismember(it, it_save)
+                    new_results = [new_results, md.results.TransientSolution(1)];
+                end
+
+                % crop out any step outside step 10 to limit some weird
+                % over-stepping from ISSM when re-starting the run
+                result_tbl = struct2table(md.results.TransientSolution);
+                result_tbl = result_tbl(result_tbl.step <= 10, :);
+                md.results.TransientSolution = table2struct(result_tbl);
+            end
+            
+            md.results = [];
+            md.results.TransientSolution = new_results;
+            clear new_results
+            savemodel(org, md);
+
+            % run time in seconds, print in minutes
+            runTime = toc;
+            runtimeTbl{jj,1} = string(geometry_name);
+            runtimeTbl{jj,2} = runTime/60;
+            runtimeTbl{jj,3} = steps;
+            runtimeTbl{jj,4} = datetime;
+            writetable(runtimeTbl, tbl_filename);
+            disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
+        end
+
+        if perform(org, 'Transient_MassUnloading_Extended_more')% {{{1 STEP 16
+            md = loadmodel(org, 'Transient_MassUnloading_Extended');
+            
+            if ~ismember(jj, 13:18); error('These low basal drag glaciers do not need more extended run time!'); end
+            
             duration = 150; 
 
             start_time = md.timestepping.final_time;
@@ -1910,7 +2018,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 result_tbl = result_tbl(result_tbl.step <= 10, :);
                 md.results.TransientSolution = table2struct(result_tbl);
             end
-            
+
             md.results = [];
             md.results.TransientSolution = new_results;
             clear new_results

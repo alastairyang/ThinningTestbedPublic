@@ -3,7 +3,7 @@
 % This is figure 2 in the main text
 % Author: Donglai Yang
 % Date: June 28, 2023
-
+clear; clc;
 %% Main script
 % load model parameter
 sim_params = readtable('runme_param.csv');
@@ -29,7 +29,6 @@ ylabel_i = [1,4,7];
 xlabel_i = [7,8,9];
 Ws_symb = [10,20,30];
 FCs_symb = [166,32,232;232,32,199;232,32,72]/255;
-
 
 % split the folder_dir into two groups, separated by grounding line depth
 folder_dir_groups = cell(1,2);
@@ -173,6 +172,7 @@ exportgraphics(gcf,'plots/maxdHdt_colorbar.pdf','ContentType','vector')
 % Load data
 N_md = 4;
 tskip = 2;
+
 ctrl_strings = ["long_models_yang/model_W5000_GL0_FC30000/MISMIP_yangTransient_CalvingOnly.mat",...
                 "long_models_yang/model_W11000_GL400_FC30000/MISMIP_yangTransient_CalvingOnly.mat",...
                 "long_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_CalvingOnly.mat",...
@@ -207,6 +207,18 @@ ds = 50; % meter
 [surface4, base4, bed4, profiles_t4] = sample_profile_evol(md4_expt, dt, ds, t_interval);
 
 clear md1_expt md2_expt md3_expt md4_expt
+
+%% get the new steady state lateral profile
+ds = 50; % meter
+
+md2_ext = load('long_models_yang/model_W11000_GL400_FC30000/MISMIP_yangTransient_MassUnloading_Extended.mat').md;
+md3_ext = load('long_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_MassUnloading_Extended.mat').md;
+md4_ext = load('long_models_yang/model_W5000_GL400_FC30000/MISMIP_yangTransient_MassUnloading_Extended.mat').md;
+
+[md2ext_s, md2ext_b, ~,~] = plot_thalweg_profile(md2_ext, ds, length(md2_ext.results.TransientSolution),0);
+[md3ext_s, md3ext_b, ~,~] = plot_thalweg_profile(md3_ext, ds, length(md3_ext.results.TransientSolution),0);
+[md4ext_s, md4ext_b, ~,~] = plot_thalweg_profile(md4_ext, ds, length(md4_ext.results.TransientSolution),0);
+clear md2_ext md3_ext md4_ext
 
 %% Plot
 % create color palette
@@ -244,7 +256,7 @@ ylabel('Elevation (m)','FontName','Aria','FontSize',18)
 % plot dH as a top plot
 p = get(gca, 'Position');
 pp = axes('Parent', gcf, 'Position', [p(1) p(2)+p(4)-inset_y p(3) inset_y]);
-plot(plot_x/1000, dH_cell{1}); hold on;
+plot(plot_x/1000, dH_cell{1},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
 set(gca,'XTick',[])
@@ -256,6 +268,8 @@ figure('Position',[100,100,fig_wid,fig_height])
 plot(plot_x/1000, surface2,'LineWidth',1.5); hold on;
 plot(plot_x/1000, base2,'LineWidth',1.5); hold on;
 plot(plot_x/1000, bed2,'-','LineWidth',2, 'Color',rock_rgb); hold on;
+plot(plot_x/1000, md2ext_s, 'k','LineWidth',1.5);hold on;
+plot(plot_x/1000, md2ext_b,'k','LineWidth',1.5); hold on;
 a = area(plot_x/1000, bed2(1,:),basevalue); hold on
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,topvalue])
@@ -267,7 +281,7 @@ colororder(line_colors)
 % plot dH as a top plot
 p = get(gca, 'Position');
 pp = axes('Parent', gcf, 'Position', [p(1) p(2)+p(4)-inset_y p(3) inset_y]);
-plot(plot_x/1000, dH_cell{2});
+plot(plot_x/1000, dH_cell{2},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
 set(gca,'XTick',[])
@@ -280,6 +294,8 @@ figure('Position',[100,100,fig_wid,fig_height])
 plot(plot_x/1000, surface3,'LineWidth',1.5); hold on;
 plot(plot_x/1000, base3,'LineWidth',1.5); hold on;
 plot(plot_x/1000, bed3,'-','LineWidth',2, 'Color',rock_rgb); hold on;
+plot(plot_x/1000, md3ext_s, 'k','LineWidth',1.5); hold on;
+plot(plot_x/1000, md3ext_b,'k','LineWidth',1.5); hold on;
 a = area(plot_x/1000, bed3(1,:),basevalue); hold on
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,topvalue])
@@ -293,7 +309,7 @@ ylabel('Elevation (m)','FontName','Aria','FontSize',18)
 % plot dH as a top plot
 p = get(gca, 'Position');
 pp = axes('Parent', gcf, 'Position', [p(1) p(2)+p(4)-inset_y p(3) inset_y]);
-plot(plot_x/1000, dH_cell{3});
+plot(plot_x/1000, dH_cell{3},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
 set(gca,'XTick',[])
@@ -305,6 +321,8 @@ figure('Position',[100,100,fig_wid,fig_height])
 plot(plot_x/1000, surface4,'LineWidth',1.5); hold on;
 plot(plot_x/1000, base4,'LineWidth',1.5); hold on;
 plot(plot_x/1000, bed4,'-','LineWidth',2, 'Color',rock_rgb); hold on;
+plot(plot_x/1000, md4ext_s, 'k','LineWidth',1.5); hold on;
+plot(plot_x/1000, md4ext_b,'k','LineWidth',1.5); hold on;
 a = area(plot_x/1000, bed4(1,:),basevalue); hold on
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,topvalue])
@@ -317,7 +335,7 @@ xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
 % plot dH as a top plot
 p = get(gca, 'Position');
 pp = axes('Parent', gcf, 'Position', [p(1) p(2)+p(4)-inset_y p(3) inset_y]);
-plot(plot_x/1000, dH_cell{4});
+plot(plot_x/1000, dH_cell{4},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
 set(gca,'YTick',[])
@@ -333,7 +351,7 @@ cb.Ticks = 0:13:26;
 %cb.TickLabels = ["0","13","26"];
 cb.FontSize = 16;
 
-% save graph
+%% save colorbar
 exportgraphics(gcf,'plots/effP_summaryPlot/profileEvol_time_colorbar.pdf','ContentType','vector')
 
 %% Appendix: functions

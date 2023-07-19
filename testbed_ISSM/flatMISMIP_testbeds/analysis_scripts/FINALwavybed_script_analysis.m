@@ -2,6 +2,7 @@
 % This script creates figure 5 in the main text
 % Author: Donglai Yang
 % Date: June 27, 2023
+clear; clc;
 %% Load model data, "md"
 load('wavybed_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat')
 
@@ -121,13 +122,14 @@ yyaxis right;
 plot(ht_data.t(1:end-1), front_locs(1:258)/1000,'-.r','LineWidth',1.5);hold on;
 plot(ht_data.t(1:end-1),gl_locs(1:258)/1000,'-.b','LineWidth',1.5)
 legend(["H(t)","Front","Grounding Line"],'FontSize',13,'Location','southwest')
+set(gca,'ycolor','r')
 ylabel('Kilometer','FontSize',13)
 xlabel('Year','FontSize',13)
 xlim([0,26])
 
 % plot profile evolution
 nexttile
-[x_plot, bed_plot,~,~] = plot_all_profiles(md,10,cp); hold on;
+[x_plot, bed_plot,~,~,colors_plot] = plot_all_profiles(md,10,cp); hold on;
 % add a dashed line at where the timeseries is taken
 xline(sample_x/1000,':k','LineWidth',2)
 xlabel('Along flow direction (km)','FontSize',13);
@@ -135,6 +137,18 @@ ylabel('Elevation (m)','FontSize',13);
 
 exportgraphics(gcf, 'plots/wavybed_gl_retreat_line.png','Resolution',600)
 
+% Create a colorbar for the profiles
+val_max = 10;
+fake_data = 26*rand(10,10);
+figure; imagesc(fake_data); 
+clim([0,val_max]); 
+colormap(colors_plot);
+cb_p = colorbar;
+cb_p.Ticks = [0,floor(val_max/2),val_max];
+cb_p.TickLabels = string(cb_p.Ticks);
+cb_p.FontSize = 14;
+cb_p.Location = 'northoutside';
+exportgraphics(gcf,'plots/wavy_colorbar.pdf','ContentType','vector')
 %% Map view of bed topography and thinning rate
 % crop the plan view extent (zoom in)
 % start by specifying x and y limits of the cropped data
@@ -183,7 +197,7 @@ xticks([35,40,45])
 exportgraphics(gcf, 'plots/wavybed_gl_retreat_map.png','Resolution',600)
 
 %% functions
-function [x,bed_profile, surface_profiles, base_profiles] = plot_all_profiles(md, skip, colormap_p)
+function [x,bed_profile, surface_profiles, base_profiles, colors_p] = plot_all_profiles(md, skip, colormap_p)
 %PLOT_ALL_PROFILES
 %   Plot the lateral profiles of the glaciers at specified time steps
 %
