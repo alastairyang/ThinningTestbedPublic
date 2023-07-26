@@ -5,7 +5,7 @@
 clear; clc;
 %% Parameters
 ds = 50; % structured meshgrid spacing
-pulse_type = 'Diffu'; % options: "Diffu","Pulse"
+pulse_type = 'Pulse'; % options: "Diffu","Pulse"
 geom_type = 'deep'; % options: "deep", "shallow"
 expt_type = 'mu'; % options: "no_mu", "mu" (without ice overburden pressure feedback; with ~. In our text, we account for the feedback by default)
 
@@ -64,9 +64,9 @@ switch expt_type
 end
 
 group = folder_dir_groups{geom_i};
-extended_idx = [1,3,7,9];
 
 %% Loading the models and processing
+extended_idx = [1,3,7,9];
 n_simu = size(folder_dir_groups{geom_i}, 1); % number of simulation in each group
 for j = extended_idx
     % read the model
@@ -158,7 +158,7 @@ for j = extended_idx
     xtickangle(45)
     
     % add pulse timeseries plot
-    switch pgenulse_type
+    switch pulse_type
         case "Diffu"
             clim([-10,10]);
             [~, pulse, pulse_t] = make_localized_forcing_timeseries();
@@ -179,10 +179,12 @@ for j = extended_idx
     % ...as an anomaly plot
     %anomaly(plot_gl_t(start_t/dt+1:end)-plot_gl_t(start_t/dt+1), gls_diff_c)
     anomaly(plot_t, gls_diff_c);
+    set(gca,'XTick',xticks)
+    set(gca,'XTickLabel',TickLabels)
+    xtickangle(45)
     hold on;
     set(gca, 'YDir','reverse')
     xlim([0,xticks(end)])
-    set(gca,'XTick',xticks); set(gca,'XTickLabel',TickLabels)
     ylabel('GL(m)','FontSize',18)
     xlabel('Time (yr)','FontSize',16)
     % add pulse

@@ -60,7 +60,7 @@ tic
 % option 2: all shallow glaciers: [1,2,3,7,8,9,13,14,15]
 % option 3: all glaciers: 1:size(mdvar_combs,1)
 % option 4: Four deep glaicer endmembers: [4,6,16,18]
-for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
+for jj = [16,18] % Consult "mdvar_combs" for the model index (the row number)
 
     var_table = mdvar_combs(jj,:);
 
@@ -81,7 +81,7 @@ for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
     end
 
     % step iteration
-    for steps = 15
+    for steps = [14,15]
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1723,8 +1723,11 @@ for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
         if perform(org, 'Transient_LocalPerturb_Pulse_Extended')% {{{1 STEP 14
             md = loadmodel(org, pulse_gauss_mu_title);
 
-            % parameter regarding time
-            duration = 20; 
+            if ismember(jj,13:18) % high basal drag testbeds takes longer to equilibrate
+                duration = 250;
+            else
+                duration = 100;
+            end
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1756,8 +1759,11 @@ for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
             law_to = 'Budd';
             % the starting friction.C should use the one in old
             % friction.C array with matching timestamp
-            [~,old_C_idx] = min(abs(next_start_time - md.friction.C(end,:)));
-            C0 = md.friction.C(1:end-1,old_C_idx);
+            [~,old_C_idx] = mink(abs(next_start_time - md.friction.C(end,:)),2);
+            old_C_idx = sort(old_C_idx);
+            C0 = transpose(interp1(md.friction.C(end,old_C_idx),...
+                                   transpose(md.friction.C(1:end-1,old_C_idx)),...
+                                   next_start_time));
             H0 = md.results.TransientSolution(end).Thickness;
             Zb = md.results.TransientSolution(end).Base;
             k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
@@ -1829,8 +1835,11 @@ for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
         if perform(org, 'Transient_LocalPerturb_Diffu_Extended')% {{{1 STEP 15
             md = loadmodel(org, diffu_gauss_mu_title);
 
-            % parameter regarding time
-            duration = 20; 
+            if ismember(jj,13:18) % high basal drag testbeds takes longer to equilibrate
+                duration = 250;
+            else
+                duration = 100;
+            end
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1860,8 +1869,11 @@ for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
-            [~,old_C_idx] = min(abs(next_start_time - md.friction.C(end,:)));
-            C0 = md.friction.C(1:end-1,old_C_idx);
+            [~,old_C_idx] = mink(abs(next_start_time - md.friction.C(end,:)),2);
+            old_C_idx = sort(old_C_idx);
+            C0 = transpose(interp1(md.friction.C(end,old_C_idx),...
+                                   transpose(md.friction.C(1:end-1,old_C_idx)),...
+                                   next_start_time));
             H0 = md.results.TransientSolution(end).Thickness;
             Zb = md.results.TransientSolution(end).Base;
             k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);

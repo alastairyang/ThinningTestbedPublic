@@ -208,13 +208,15 @@ ds = 50; % meter
 
 clear md1_expt md2_expt md3_expt md4_expt
 
-%% get the new steady state lateral profile
+% get the new steady state lateral profile
 ds = 50; % meter
 
+md1_ext = load('long_models_yang/model_W5000_GL0_FC30000/MISMIP_yangTransient_MassUnloading_Extended.mat').md;
 md2_ext = load('long_models_yang/model_W11000_GL400_FC30000/MISMIP_yangTransient_MassUnloading_Extended.mat').md;
 md3_ext = load('long_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_MassUnloading_Extended.mat').md;
 md4_ext = load('long_models_yang/model_W5000_GL400_FC30000/MISMIP_yangTransient_MassUnloading_Extended.mat').md;
 
+[md1ext_s, md1ext_b, ~,~] = plot_thalweg_profile(md1_ext, ds, length(md1_ext.results.TransientSolution),0);
 [md2ext_s, md2ext_b, ~,~] = plot_thalweg_profile(md2_ext, ds, length(md2_ext.results.TransientSolution),0);
 [md3ext_s, md3ext_b, ~,~] = plot_thalweg_profile(md3_ext, ds, length(md3_ext.results.TransientSolution),0);
 [md4ext_s, md4ext_b, ~,~] = plot_thalweg_profile(md4_ext, ds, length(md4_ext.results.TransientSolution),0);
@@ -245,6 +247,8 @@ plot(plot_x/1000, surface1,'-','LineWidth',1.5); hold on;
 plot(plot_x/1000, base1,'-','LineWidth',1.5); hold on;
 plot(plot_x/1000, bed1,'-','LineWidth',2, 'Color',rock_rgb); hold on;
 a = area(plot_x/1000, bed1(1,:),basevalue); hold on
+plot(plot_x/1000, md1ext_s, 'k','LineWidth',1.5);hold on;
+plot(plot_x/1000, md1ext_b,'k','LineWidth',1.5); hold on;
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,topvalue]);
 line_colors = colormap_to_colororder(cp, size(surface1,1),1,100);
