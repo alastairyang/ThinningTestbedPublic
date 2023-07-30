@@ -60,7 +60,7 @@ tic
 % option 2: all shallow glaciers: [1,2,3,7,8,9,13,14,15]
 % option 3: all glaciers: 1:size(mdvar_combs,1)
 % option 4: Four deep glaicer endmembers: [4,6,16,18]
-for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
+for jj = 16 % Consult "mdvar_combs" for the model index (the row number)
 
     var_table = mdvar_combs(jj,:);
 
@@ -81,7 +81,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
     end
 
     % step iteration
-    for steps = 9
+    for steps = 17
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -214,7 +214,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             md.timestepping = timesteppingadaptive();
             md.timestepping.time_step_min = 0.01;
             md.timestepping.start_time = start_time;
-            md.timestepping.final_time = md.timestepping.start_time + 500;
+            md.timestepping.final_time = md.timestepping.start_time + 500; 
             
             % parameters
             np = min(round(md.mesh.numberofelements/1000), feature('numcores'));
@@ -777,6 +777,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
 
         if perform(org, pulse_gauss_mu_title)% {{{1 STEP 9: Basal perturbation: pulse gaussian patch + mass unloading
             md = loadmodel(org, 'Transient_ExtraInfo');
+            md.stressbalance.requested_outputs={'default'};
 
             % parameter regarding time
             end_time = perturb_duration + 2*no_retreat_duration;
@@ -926,6 +927,12 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             Zb = md.results.TransientSolution(end).Base;
             k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb, 1);
 
+            % export to .mat to be used later
+            save([org.repository '/' 'C0.mat'], 'C0')
+            save([org.repository '/' 'H0.mat'], 'H0')
+            save([org.repository '/' 'Zb.mat'], 'Zb')
+            save([org.repository '/' 'k_budd.mat'],'k_budd')
+
             % add an initial time to the friction coef vector
             md.friction.C = [C0; next_start_time];
 
@@ -989,7 +996,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                         md.results.TransientSolution = table2struct(result_tbl);
                     end
                     new_results = [new_results, md.results.TransientSolution(1)];
-                    % Retain only "TransientSolution"
+                    % Retain only "TransientSolution" and put back to results
                     names = fieldnames(md.results);
                     results_cell = struct2cell(md.results);
                     md.results = cell2struct(results_cell(names == "TransientSolution"),...
@@ -1018,6 +1025,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
 
         if perform(org, diffu_gauss_mu_title)% {{{1 STEP 10: Basal perturbation: diffused pulse gaussian patch + overburden pressure change
             md = loadmodel(org, 'Transient_ExtraInfo');
+            md.stressbalance.requested_outputs={'default'};
 
             % parameter regarding time
             end_time = perturb_duration + 2*no_retreat_duration;
@@ -1166,6 +1174,12 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             H0 = md.results.TransientSolution(end).Thickness;
             Zb = md.results.TransientSolution(end).Base;
             k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb, 1);
+
+            % export to .mat to be used later
+            save([org.repository '/' 'C0.mat'], 'C0')
+            save([org.repository '/' 'H0.mat'], 'H0')
+            save([org.repository '/' 'Zb.mat'], 'Zb')
+            save([org.repository '/' 'k_budd.mat'],'k_budd')
 
             % add an initial time to the friction coef vector
             md.friction.C = [C0; next_start_time];
@@ -1554,6 +1568,11 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             H0 = md.results.TransientSolution(end).Thickness;
             Zb = md.results.TransientSolution(end).Base;
             k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb, m_plastic);
+            % export to .mat to be used later
+            save([org.repository '/' 'C0.mat'], 'C0')
+            save([org.repository '/' 'H0.mat'], 'H0')
+            save([org.repository '/' 'Zb.mat'], 'Zb')
+            save([org.repository '/' 'k_budd.mat'],'k_budd')
 
             % add an initial time to the friction coef vector
             md.friction.C = [C0; next_start_time];
@@ -1669,14 +1688,18 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
-            [~,old_C_idx] = min(abs(next_start_time - md.friction.C(end,:)));
-            C0 = md.friction.C(1:end-1,old_C_idx);
-            H0 = md.results.TransientSolution(end).Thickness;
-            Zb = md.results.TransientSolution(end).Base;
-            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
-
+            % load the respective reference datum
+            load([org.repository '/C0.mat'])
+            load([org.repository '/H0.mat'])
+            load([org.repository '/Zb.mat'])
+            load([org.repository '/k_budd.mat'])
+                
             % add an initial time to the friction coef vector
-            md.friction.C = [C0; next_start_time];
+            % query from previous friction.C array, based on the nearest
+            % time
+            [~,old_C_idx] = min(abs(next_start_time - md.friction.C(end,:)));
+            C = md.friction.C(1:end-1,old_C_idx);
+            md.friction.C = [C; next_start_time];
 
             % No extra model output request
             md.stressbalance.requested_outputs={'default'};
@@ -1694,14 +1717,14 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 md.settings.output_frequency = dt_mu/md.timestepping.time_step;
 
                 % calculate new fric coef
-                if it == 1 % initial condition: delta(H) = 0
-                    deltaH = zeros(size(md.geometry.thickness));
-                    Hi = H0 + deltaH;
-                    C = C0;
-                else
+%                 if it == 1 % initial condition: delta(H) = 0
+%                     deltaH = zeros(size(md.geometry.thickness));
+%                     Hi = H0 + deltaH;
+%                     C = C1;
+%                 else
                     deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
                     Hi = H0 + deltaH;
-                end
+                %end
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 % append time and assign
@@ -1743,7 +1766,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             md = loadmodel(org, pulse_gauss_mu_title);
 
             if ismember(jj,13:18) % high basal drag testbeds takes longer to equilibrate
-                duration = 250;
+                duration = 20;
             else
                 duration = 100;
             end
@@ -1776,25 +1799,28 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
+
+            % load the respective reference datum
+            load([org.repository '/C0.mat'])
+            load([org.repository '/H0.mat'])
+            load([org.repository '/Zb.mat'])
+            load([org.repository '/k_budd.mat'])
+
+            % add an initial time to the friction coef vector
             % the starting friction.C should use the one in old
             % friction.C array with matching timestamp
             [~,old_C_idx] = mink(abs(next_start_time - md.friction.C(end,:)),2);
             old_C_idx = sort(old_C_idx);
-            C0 = transpose(interp1(md.friction.C(end,old_C_idx),...
+            C = transpose(interp1(md.friction.C(end,old_C_idx),...
                                    transpose(md.friction.C(1:end-1,old_C_idx)),...
                                    next_start_time));
-            H0 = md.results.TransientSolution(end).Thickness;
-            Zb = md.results.TransientSolution(end).Base;
-            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
-
-            % add an initial time to the friction coef vector
-            md.friction.C = [C0; next_start_time];
+            md.friction.C = [C; next_start_time];
 
             % No extra model output request
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 8; % save every __ years
+            save_yr = 4; % save every __ years
             it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
@@ -1806,14 +1832,14 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 md.settings.output_frequency = dt_mu/md.timestepping.time_step;
 
                 % calculate new fric coef
-                if it == 1 % initial condition: delta(H) = 0
-                    deltaH = zeros(size(md.geometry.thickness));
-                    Hi = H0 + deltaH;
-                    C = C0;
-                else
+%                 if it == 1 % initial condition: delta(H) = 0
+%                     deltaH = zeros(size(md.geometry.thickness));
+%                     Hi = H0 + deltaH;
+%                     C = C0;
+%                 else
                     deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
                     Hi = H0 + deltaH;
-                end
+%                 end
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 % append time and assign
@@ -1824,7 +1850,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 % solve
                 md = solve(md,'tr');
 
-                % concatenate results for every 2 years
+                % concatenate results
                 if ismember(it, it_save)
                     new_results = [new_results, md.results.TransientSolution(1)];
                 end
@@ -1888,23 +1914,25 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
-            [~,old_C_idx] = mink(abs(next_start_time - md.friction.C(end,:)),2);
-            old_C_idx = sort(old_C_idx);
-            C0 = transpose(interp1(md.friction.C(end,old_C_idx),...
-                                   transpose(md.friction.C(1:end-1,old_C_idx)),...
-                                   next_start_time));
-            H0 = md.results.TransientSolution(end).Thickness;
-            Zb = md.results.TransientSolution(end).Base;
-            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
+            % load the respective reference datum
+            load([org.repository '/C0.mat'])
+            load([org.repository '/H0.mat'])
+            load([org.repository '/Zb.mat'])
+            load([org.repository '/k_budd.mat'])
 
             % add an initial time to the friction coef vector
-            md.friction.C = [C0; next_start_time];
+            [~,old_C_idx] = mink(abs(next_start_time - md.friction.C(end,:)),2);
+            old_C_idx = sort(old_C_idx);
+            C = transpose(interp1(md.friction.C(end,old_C_idx),...
+                                   transpose(md.friction.C(1:end-1,old_C_idx)),...
+                                   next_start_time));
+            md.friction.C = [C; next_start_time];
 
             % No extra model output request
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 8; % save every __ years
+            save_yr = 4; % save every __ years
             it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
@@ -1916,14 +1944,14 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 md.settings.output_frequency = dt_mu/md.timestepping.time_step;
 
                 % calculate new fric coef
-                if it == 1 % initial condition: delta(H) = 0
-                    deltaH = zeros(size(md.geometry.thickness));
-                    Hi = H0 + deltaH;
-                    C = C0;
-                else
+%                 if it == 1 % initial condition: delta(H) = 0
+%                     deltaH = zeros(size(md.geometry.thickness));
+%                     Hi = H0 + deltaH;
+%                     C = C0;
+%                 else
                     deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
                     Hi = H0 + deltaH;
-                end
+%                 end
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 % append time and assign
@@ -1934,7 +1962,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 % solve
                 md = solve(md,'tr');
 
-                % concatenate results for every 2 years
+                % concatenate results 
                 if ismember(it, it_save)
                     new_results = [new_results, md.results.TransientSolution(1)];
                 end
@@ -1996,19 +2024,26 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             % get the equivalent coefficients if using Budd sliding law
             law_from = 'Weertman';
             law_to = 'Budd';
-            C0 = md.friction.C(1:end-1,end);
-            H0 = md.results.TransientSolution(end).Thickness;
-            Zb = md.results.TransientSolution(end).Base;
-            k_budd = fric_coef_conversion(law_from, law_to, md, C0, H0, Zb,1);
+            % load the respective reference datum
+            load([org.repository '/C0.mat'])
+            load([org.repository '/H0.mat'])
+            load([org.repository '/Zb.mat'])
+            load([org.repository '/k_budd.mat'])
 
             % add an initial time to the friction coef vector
-            md.friction.C = [C0; next_start_time];
+            % add an initial time to the friction coef vector
+            [~,old_C_idx] = mink(abs(next_start_time - md.friction.C(end,:)),2);
+            old_C_idx = sort(old_C_idx);
+            C = transpose(interp1(md.friction.C(end,old_C_idx),...
+                                   transpose(md.friction.C(1:end-1,old_C_idx)),...
+                                   next_start_time));
+            md.friction.C = [C; next_start_time];
 
             % No extra model output request
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 8; % save every __ years
+            save_yr = 4; % save every __ years
             it_save = 1:(save_yr/dt_mu):duration/dt_mu;
             for it = 1:duration/dt_mu            
 
@@ -2020,14 +2055,14 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 md.settings.output_frequency = dt_mu/md.timestepping.time_step;
 
                 % calculate new fric coef
-                if it == 1 % initial condition: delta(H) = 0
-                    deltaH = zeros(size(md.geometry.thickness));
-                    Hi = H0 + deltaH;
-                    C = C0;
-                else
+%                 if it == 1 % initial condition: delta(H) = 0
+%                     deltaH = zeros(size(md.geometry.thickness));
+%                     Hi = H0 + deltaH;
+%                     C = C0;
+%                 else
                     deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
                     Hi = H0 + deltaH;
-                end
+%                 end
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 % append time and assign
@@ -2065,8 +2100,12 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
 
-        if perform(org, [diffu_gauss_mu_title,'_Extended'])% {{{1 STEP 17: Extended basal perturbation: diffused pulse gaussian patch + overburden pressure change for longer time
+        if perform(org, [pulse_gauss_mu_title '_Extended'])% {{{1 STEP 17: Basal perturbation: pulse gaussian patch + mass unloading
             md = loadmodel(org, 'Transient_ExtraInfo');
+            md.stressbalance.requested_outputs={'default'};
+
+            % extended time
+            time_add = 5; % years
 
             % parameter regarding time
             end_time = perturb_duration + 2*no_retreat_duration;
@@ -2086,7 +2125,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             % do not interpolate forcing
             md.timestepping.interp_forcing = 0;
 
-            % Calving
+            %% Calving
             % forcings
             retreat_advance = linspace(100,retreat_rate_max, perturb_duration/2);
             retreat_slow = flip(retreat_advance);
@@ -2126,7 +2165,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 md.levelset.spclevelset(:,end+1) = [signeddistance; md.timestepping.start_time + time];
             end
             
-            % Basal perturbation with a Gaussian patch
+            %% Basal perturbation with a Gaussian patch
             % add an initial time column to the friction coef vector
             C0 = md.friction.C;
             init_taub = C0.^2.*md.results.TransientSolution(end).Vel./md.constants.yts;
@@ -2135,11 +2174,11 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             perturb_t = 0:gauss_timestep:perturb_duration-gauss_timestep;
             no_perturb_t = 0:gauss_timestep:no_retreat_duration-gauss_timestep;
 
-            % get diffused pulse gaussian
-            diffu_gauss = gauss_mag*make_diffu_gauss(pulse_gauss_tscale, diffu_gauss_tscale, gauss_efold, gauss_perturb_repeat_tscale, gauss_timestep);
+            % get pulse gaussian
+            pulse_gauss = gauss_mag*make_pulse_gauss(pulse_gauss_tscale, gauss_efold, gauss_perturb_repeat_tscale, gauss_timestep, pulse_gauss_tshift);
             % stack them to make a full sequence
             total_cycle = perturb_duration/gauss_perturb_repeat_tscale;
-            gauss_mags = repmat(diffu_gauss, 1, total_cycle);
+            gauss_mags = repmat(pulse_gauss, 1, total_cycle);
             % add the no perturb period
             gauss_mags = [zeros(size(no_perturb_t)), gauss_mags, zeros(size(no_perturb_t))];
             % actual time axis
@@ -2189,7 +2228,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                 % and then assimilate into md.friction.C
             end
 
-            %% Ice overburden pressure change
+            %% Mass unloading
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
@@ -2220,8 +2259,11 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             md.friction.C = [C0; next_start_time];
 
             it_count = 0;
-            total_iter = (end_time/gauss_timestep)-1;
+            total_iter = ((end_time + time_add)/gauss_timestep)-1;
+            awatch = tic; % total run time stop watch
             for it = 1:total_iter
+
+                bwatch = tic; % remaining time estimator watch
                 it_count = it_count + 1;
                 results = md.results.TransientSolution;
                 % restart and specify sim duration
@@ -2235,13 +2277,16 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                     deltaH = mu_time_mask_interp(it)*zeros(size(md.geometry.thickness));
                     Hi = H0 + deltaH;
                     C = C0;
-                else
-                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0); % still need deltaH to mask out the first several non-perturb years
+                elseif it <= end_time/gauss_timestep-1 % still within perturbation period
+                    deltaH = mu_time_mask_interp(it)*(results(end).Thickness - H0); 
+                    Hi = H0 + deltaH;
+                else % in the extended period
+                    deltaH = results(end).Thickness - H0;
                     Hi = H0 + deltaH;
                 end
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
-                C = C - delta_C_all(:,it);
+                if it <= end_time/gauss_timestep-1; C = C - delta_C_all(:,it);end 
                 C(C<0) = 0;
                 % append time and assign
                 current_time = md.timestepping.start_time;
@@ -2250,7 +2295,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
 
                 % solve
                 md = solve(md,'tr');
-                
+
                 if it == 1 % save the first time
                     it_count = 0;
                     new_results = [new_results, md.results.TransientSolution(1)];
@@ -2262,9 +2307,11 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                     clear names results_cell
                 end
                 
-                % save every time steps; we also save the last 20 timesteps
+                % save every 10 timesteps; 
+                % also save the last 20 timesteps (make sure of the continuity of data when restart the
+                % transient run)
                 if it_count == 10 || ismember(it, total_iter-20:total_iter) 
-                    it_count = 0; % reset the profile save count
+                    it_count = 0;
 
                     % crop out any step other than step 1 to limit some weird
                     % over-stepping from ISSM
@@ -2275,13 +2322,20 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
                         md.results.TransientSolution = table2struct(result_tbl);
                     end
                     new_results = [new_results, md.results.TransientSolution(1)];
-                    % Retain only "TransientSolution"
+                    % Retain only "TransientSolution" and put back to results
                     names = fieldnames(md.results);
                     results_cell = struct2cell(md.results);
                     md.results = cell2struct(results_cell(names == "TransientSolution"),...
                                              names(names == "TransientSolution"));
                     clear names results_cell result_tbl
                 end
+                timer = toc(bwatch);
+                timer2 = toc(awatch);
+                t_remain1 = (total_iter - it)*timer/60; % remaining time in meter
+                t_remain2 = timer2/it*total_iter/60;
+                t_remain = max([t_remain1,t_remain2]);
+                hr_remain = t_remain/60; % in hour
+                disp(['    Remaining time: ' num2str(t_remain) ' mins, or ' num2str(hr_remain) ' in hours'])
             end
             md.results = previous_results;
             md.results.TransientSolution = new_results;
@@ -2289,7 +2343,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             savemodel(org, md);
 
             % run time in seconds, print in minutes
-            runTime = toc;
+            runTime = toc(awatch);
             runtimeTbl{jj,1} = string(geometry_name);
             runtimeTbl{jj,2} = runTime/60;
             runtimeTbl{jj,3} = steps;
@@ -2297,6 +2351,7 @@ for jj = [16] % Consult "mdvar_combs" for the model index (the row number)
             writetable(runtimeTbl, tbl_filename);
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
+
     end
 end
 
