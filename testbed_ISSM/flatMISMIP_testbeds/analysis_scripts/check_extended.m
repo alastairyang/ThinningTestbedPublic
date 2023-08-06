@@ -141,6 +141,8 @@ ax.FontSize = 18;
 xline(16,':k','LineWidth',1.2); hold on
 xline(last_t,':k','LineWidth',2.4); hold off
 
+
+
 %% Check the continuity of friction coefficient
 ds = 200;
 pulse_type = 'Pulse';
@@ -195,3 +197,56 @@ exptC_grid = squeeze(exptC_grid(:,mid_y,:));
 imagesc(time - time(1),x,deltaC_grid')
 clim_val = 1e3;
 clim([-clim_val, clim_val]); colorbar
+
+
+
+%% Check extended, but it is one long simulation
+ds = 200;
+dt = 0.02;
+pulse_type = 'Pulse';
+runme_params = readtable('runme_param.csv');
+
+dir = 'long_models_yang/model_W5000_GL400_FC120000/';
+expt_name = ['MISMIP_yangTransient_Calving_MassUnloading_',pulse_type,'GaussianPerturb_8_Extended.mat'];
+ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
+ctrl_extend_name = 'MISMIP_yangTransient_MassUnloading_Extended.mat';
+md_ctrl = load([dir ctrl_name]).md;
+md_ctrl_extend = load([dir ctrl_extend_name]).md;
+md_expt = load([dir expt_name]).md;
+
+% first, just check the continuity of dH and fric. Coef in the experiment
+results_tbl_expt = struct2table(md_expt.results.TransientSolution);
+expt_time = results_tbl_expt.time - results_tbl_expt.time(1);
+[expt_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, results_tbl_expt.Thickness, ds);
+% get center flow line
+expt_cfl = transpose(squeeze(expt_grid(:,floor(length(y)/2),:)));
+expt_cfl = expt_cfl - expt_cfl(:,1); % dH with wrt to the starting time
+% interpolate onto an evenly spaced time axis
+time = expt_time(1):dt:expt_time(end);
+expt_cfl = transpose(interp1(expt_time, expt_cfl', time));
+
+expt_dH_cfl = expt_cfl(:,2:end) - expt_cfl(:,1:end-1);
+
+figure; 
+imagesc(time, x, expt_dH_cfl)
+colorbar;clim([-0.5,0.5])
+colormap(diverg_colormap(50))
+
+% interp C
+C = md_expt.friction.C(1:end-1,:);
+C_time = transpose(md_expt.friction.C(end,:));
+C_time = C_time - C_time(1);
+C = transpose(interp1(C_time, C', time));
+% transform into grid and 
+C_grid = mat2cell(C',ones(1,length(time)));
+[C_grid, x, y] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, C_grid, ds);
+% just the center flowline
+mid_y = floor(size(C_grid, 2)/2);
+C_grid = transpose(squeeze(C_grid(:,mid_y,:)));
+
+dC = C_grid(:, 2:end) - C_grid(:, 1:end-1);
+
+figure; 
+imagesc(time(1:end-1), x, dC)
+colorbar; clim([-5e2,5e2])
+colormap(diverg_colormap(50))
