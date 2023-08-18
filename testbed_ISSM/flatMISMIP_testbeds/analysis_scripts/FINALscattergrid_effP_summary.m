@@ -140,7 +140,7 @@ plotname = ['scatter_effP_' num2str(depth) '.pdf'];
 % export the plot
 exportgraphics(gcf,['plots/composite_effP/' plotname],'ContentType','vector')
 
-%% Generate a color bar for the attenuation distance
+% Generate a color bar for the attenuation distance
 color_len = 10;
 colors_p = [linspace(red(1),magenta(1),color_len)',...
             linspace(red(2),magenta(2),color_len)',...
@@ -154,7 +154,7 @@ cb.FontSize = 16;
 % save graph
 exportgraphics(gcf,'plots/attenuL_colorbar.pdf','ContentType','vector')
 
-%% Generate a fake circle sequence as a "colorbar" for max dh/dt
+% Generate a fake circle sequence as a "colorbar" for max dh/dt
 dhdt_fake = [4, 7, 10, 13];
 x_fake = [10,30,50,70];
 y_fake = 50;
@@ -253,10 +253,11 @@ a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,topvalue]);
 line_colors = colormap_to_colororder(cp, size(surface1,1),1,100);
 colororder(line_colors)
-set(gca,'XTick',[])
+set(gca,'XTick',0:10:50)
 set(gca,'YTick',basevalue:400:topval_plot)
 set(gca,'FontSize',16)
 ylabel('Elevation (m)','FontName','Aria','FontSize',18)
+xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
 % plot dH as a top plot
 p = get(gca, 'Position');
 pp = axes('Parent', gcf, 'Position', [p(1) p(2)+p(4)-inset_y p(3) inset_y]);
@@ -264,6 +265,7 @@ plot(plot_x/1000, dH_cell{1},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
 set(gca,'XTick',[])
+set(gca,'YTick',-200:100:0)
 set(gca,'FontSize',16)
 exportgraphics(gcf,'plots/effP_summaryPlot/profiles_evolve1.png','Resolution',600)
 
@@ -277,9 +279,11 @@ plot(plot_x/1000, md2ext_b,'k','LineWidth',1.5); hold on;
 a = area(plot_x/1000, bed2(1,:),basevalue); hold on
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,topvalue])
-set(gca,'YTick',[])
-set(gca,'XTick',[])
+set(gca,'YTick',basevalue:400:topval_plot)
+set(gca,'XTick',0:10:50)
 set(gca,'FontSize',16)
+ylabel('Elevation (m)','FontName','Aria','FontSize',18)
+xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
 line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
 colororder(line_colors)
 % plot dH as a top plot
@@ -289,7 +293,7 @@ plot(plot_x/1000, dH_cell{2},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
 set(gca,'XTick',[])
-set(gca,'YTick',[])
+set(gca,'YTick',-200:100:0)
 set(gca,'FontSize',16)
 exportgraphics(gcf,'plots/effP_summaryPlot/profiles_evolve2.png','Resolution',600)
 
@@ -317,6 +321,7 @@ plot(plot_x/1000, dH_cell{3},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
 set(gca,'XTick',[])
+set(gca,'YTick',-200:100:0)
 set(gca,'FontSize',16)
 exportgraphics(gcf,'plots/effP_summaryPlot/profiles_evolve3.png','Resolution',600)
 
@@ -330,11 +335,12 @@ plot(plot_x/1000, md4ext_b,'k','LineWidth',1.5); hold on;
 a = area(plot_x/1000, bed4(1,:),basevalue); hold on
 a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;
 ylim([basevalue,topvalue])
-set(gca,'YTick',[])
+set(gca,'YTick',basevalue:400:topval_plot)
 set(gca,'XTick',0:10:60)
 set(gca,'FontSize',16)
 line_colors = colormap_to_colororder(cp, size(surface2,1),1,100);
 colororder(line_colors)
+ylabel('Elevation (m)','FontName','Aria','FontSize',18)
 xlabel('Along-flow distance (km)','FontName','Aria','FontSize',18)
 % plot dH as a top plot
 p = get(gca, 'Position');
@@ -342,7 +348,7 @@ pp = axes('Parent', gcf, 'Position', [p(1) p(2)+p(4)-inset_y p(3) inset_y]);
 plot(plot_x/1000, dH_cell{4},'LineWidth',1.5); hold on;
 colororder(line_colors)
 ylim([-240,0])
-set(gca,'YTick',[])
+set(gca,'YTick',-200:100:0)
 set(gca,'XTick',[])
 set(gca,'FontSize',16)
 exportgraphics(gcf,'plots/effP_summaryPlot/profiles_evolve4.png','Resolution',600)

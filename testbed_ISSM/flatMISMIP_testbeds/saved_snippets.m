@@ -12,24 +12,6 @@ front_xy_interp = [front_x_interp, transpose(y(y_crop))];
 [X_crop, Y_crop] = meshgrid(x(x_crop),y(y_crop));
 dist_to_front = abs(front_x_interp - X_crop);
 
-%% SNR
-% we use uniform distribution between low and high threshold
-noise_lowamp  = 0; % lower bar 0 m uncertainty
-noise_highamp = 0.5; % higher bar 0.5 m uncertainty
-n_samples = 500; % 200 random sampling of noise amplitude
-amp_rand = (noise_highamp - noise_lowamp).*rand(n_samples,size(expt_S_grid_v,2)) + noise_lowamp;
-noise = transpose(sqrt(amp_rand)/3.*transpose(randn(size(md_grid_v,2),n_samples)));
-snr_ht = zeros(size(md_grid_v,1),n_samples);
-for ni = 1:n_samples
-    for k = 1:size(md_grid_v,1)
-        if sum(isnan(md_grid_v(k,:)))>0 % skip nan
-            snr_ht(k,ni) = nan;
-        else
-            snr_ht(k,ni) = snr(md_grid_v(k,:), noise(:,ni));
-        end
-    end
-end
-
 %% locate peak ampitude function
 function locs = local_perturb_peaktime(data, t, rel_loc, t_crop, period)
 %LOCAL_PERTURB_PEAKTIME find the arrival time of the kinematic wave
@@ -351,3 +333,104 @@ end
             writetable(runtimeTbl, tbl_filename);
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
+
+%% The first two columns in the old stress loss plot
+% The first column: map view of thickness chnage and location of max thinning point
+% load model and model parameter table
+lowK_md  = load('long_models_yang/model_W5000_GL400_FC30000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
+highK_md = load('long_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat').md;
+param_tbl = readtable('runme_param.csv');
+
+% get dH
+lowK_dH = lowK_md.results.TransientSolution(end).Thickness - lowK_md.results.TransientSolution(1).Thickness;
+highK_dH = highK_md.results.TransientSolution(end).Thickness - highK_md.results.TransientSolution(1).Thickness;
+lowK_mask = lowK_md.results.TransientSolution(end).MaskIceLevelset;
+highK_mask = highK_md.results.TransientSolution(end).MaskIceLevelset;
+lowK_dH(lowK_mask>0) = nan;
+highK_dH(highK_mask>0) = nan;
+% get grounding line at last timestep 
+lowK_gl = isoline(lowK_md, lowK_md.results.TransientSolution(end).MaskOceanLevelset,'value',0);
+highK_gl = isoline(highK_md, highK_md.results.TransientSolution(end).MaskOceanLevelset,'value',0);
+[lowK_dH, x, y] = mesh_to_grid(lowK_md.mesh.elements, lowK_md.mesh.x, lowK_md.mesh.y, lowK_dH, 50);
+[highK_dH,~, ~] = mesh_to_grid(highK_md.mesh.elements, highK_md.mesh.x, highK_md.mesh.y, highK_dH, 50);
+lowK_dH = lowK_dH'; highK_dH = highK_dH';
+% crop out the x beyond terminus0_x
+xi_keep = find(x < param_tbl.terminus0_x);
+x_c = x(xi_keep);
+lowK_dH = lowK_dH(xi_keep,:);
+highK_dH = highK_dH(xi_keep,:);
+
+% find max dH point along the thalweg
+mid_yi = floor(size(lowK_dH,2)/2);
+[~, maxi_low]  = max(abs(lowK_dH(:,mid_yi))); 
+[~, maxi_high] = max(abs(highK_dH(:,mid_yi)));
+
+% plot left column: map view of dH and max dH locations
+% load colormap
+load('plots/colormap/nuuk_polar.mat')
+figure('Position',[100,100,350,700])
+tiledlayout(1,2,"TileSpacing","none")
+nexttile
+imagesc(y/1e3,x_c/1e3,lowK_dH); hold on;
+scatter(lowK_gl(1).y/1e3, lowK_gl(1).x/1e3,10,'k','filled'); hold on;
+colormap(nuuk); clim([-400,0])
+scatter(y(mid_yi)/1e3, x_c(maxi_low)/1e3, 100,'r','filled')
+ylabel('Along flow distance (km)','FontSize',15)
+
+nexttile
+imagesc(y/1e3,x_c/1e3,highK_dH); hold on;
+scatter(highK_gl(1).y/1e3, highK_gl(1).x/1e3,10,'k','filled'); hold on;
+scatter(y(mid_yi)/1e3, x_c(maxi_high)/1e3, 100,'b','filled')
+colormap(nuuk); clim([-400,0])
+set(gca,'YTick',[])
+colorbar('north')
+
+% export
+exportgraphics(gcf, 'plots/composite_stressloss/dH.png','Resolution',600);
+
+%% The mid column: H(t), GL, and front
+% get h(t) at the max dH point
+lowK_dH_pt = plot_select_dhdt(lowK_md, x_c(maxi_low), y(mid_yi));
+highK_dH_pt = plot_select_dhdt(highK_md, x_c(maxi_high), y(mid_yi));
+% get gl
+[lowK_gl,t]  = plot_gl_timeseries(lowK_md);
+highK_gl = plot_gl_timeseries(highK_md); 
+% get front
+lowK_front  = plot_front_timeseries(lowK_md);
+highK_front = plot_front_timeseries(highK_md);
+t = t - t(1);
+
+% plot
+figure('Position',[100,100,350,700])
+tiledlayout(3,1,"TileSpacing","none")
+
+nexttile
+plot(t,lowK_front/1e3,'-k','LineWidth',2);hold off; % only one front is needed for plotting
+ylabel('Front location (km)','FontSize',15)
+xline(21, ':k','LineWidth',1.2)
+xlim([0,26])
+set(gca,'YTick',48:4:58)
+set(gca,'Xtick',[])
+set(gca,'FontSize',14)
+
+nexttile
+plot(t,lowK_dH_pt,'-r','LineWidth',2);hold on;
+plot(t,highK_dH_pt,'-b','LineWidth',2); hold off;
+xline(21, ':k','LineWidth',1.2)
+xlim([0,26])
+set(gca,'YTick',-250:100:50)
+set(gca,'ycolor','k')
+set(gca,'Xtick',[])
+set(gca,'FontSize',14)
+
+nexttile
+plot(t,lowK_gl/1e3,':r','LineWidth',2);hold on;
+plot(t,highK_gl/1e3,':b','LineWidth',2); hold on;
+ylabel('GL location (km)','FontSize',15)
+xline(21, ':k','LineWidth',1.2)
+xlim([0,26])
+xlabel('Year','FontSize',15)
+set(gca,'YTick',40:4:54)
+set(gca,'FontSize',14)
+% export
+exportgraphics(gcf,'plots/composite_stressloss/gl_front_ht.png','Resolution',600);

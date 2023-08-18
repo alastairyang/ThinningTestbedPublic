@@ -135,7 +135,7 @@ end
 % plot_attenuation([decay_length, A], fliplr(gl_xx), fliplr(gl_corr_mid_c))
 %% Making the plot
 figure('Position',[100,100,500,500])
-tiledlayout(3,3,'TileSpacing','none')
+tiledlayout(3,3,'TileSpacing','compact')
 line_styles = [":","-"];
 for p = 1:length(md_types)
     for j = 1:n_simu
@@ -160,61 +160,18 @@ for p = 1:length(md_types)
         set(gca,'ytick',[1,5,9,13])
         set(gca,'xtick',[20,40])
         if ismember(j, [1,4,7])
-            set(gca,'ytick',[0.8, 1]);
+            set(gca,'ytick',[0.6,0.8, 1]);
         else
             set(gca,'ytick',[]);
         end
         if ismember(j, [7,8,9])
-            set(gca,'xtick',[20,40]);
+            set(gca,'xtick',[0,20,40]);
         else
             set(gca,'xtick',[]);
         end
     end
 end
-ax = nexttile(4); ax.YLabel.String = 'Correlation'; ax.YLabel.FontSize = 15;
+ax = nexttile(4); ax.YLabel.String = 'Correlation with dynamic thinning'; ax.YLabel.FontSize = 15;
 ax = nexttile(8); ax.XLabel.String = 'Distance to calving front (km)'; ax.XLabel.FontSize = 15;
 
 exportgraphics(gcf,'plots/correlation_deep.png',"Resolution",600)
-
-% for the shallow glaciers: but they don't have grounding lines so kind of
-% pointless
-% figure('Position',[600,100,500,500])
-% tiledlayout(3,3,'TileSpacing','none')
-% for j = 1:n_simu
-%     nexttile % plot in km and year
-%     % plot shallow
-%     scatter(dist_to_front{1,j}/1000, front_corrs{1,j},...
-%         'o','MarkerFaceColor','r','MarkerEdgeColor','r','MarkerFaceAlpha',.2,'MarkerEdgeAlpha',.2); hold on;
-%     scatter(dist_to_front{1,j}/1000, gl_corrs{1,j},...
-%         'o','MarkerFaceColor','b','MarkerEdgeColor','b','MarkerFaceAlpha',.2,'MarkerEdgeAlpha',.2); hold on
-%     ylim([0.5,1])
-%     xlim([0,50])
-%     legend(["front","GL"],'Location','southwest')
-%     set(gca,'ytick',[1,5,9,13])
-%     set(gca,'xtick',[10,30,50])
-% end
-% ax = nexttile(4); ax.YLabel.String = 'Correlation';
-% ax = nexttile(8); ax.XLabel.String = 'Distance to calving front (km)';
-% 
-% exportgraphics(gcf,['plots/correlation_',md_type,'_shallow.png'],"Resolution",500)
-
-
-%% APPENDIEX: functions
-function err = minimize_attenuation(v, x, data)
-    beta = v(1); % decay length scale
-    A = v(2); % magnitude
-    A_decay = A.*exp(-beta.*x);
-    err = sqrt(mean((A_decay - data).^2));
-end
-
-function plot_attenuation(v, x, data)
-    beta = v(1); % decay length scale
-    A = v(2); % magnitude
-    A_decay = A.*exp(-beta.*x);
-
-    figure;
-    scatter(x, data, 4,'red'); hold on;
-    plot(x, A_decay, '-b'); hold off
-    legend(["data","model"])
-
-end

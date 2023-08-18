@@ -1,18 +1,17 @@
 %% Plot h(t) of center flowline from localized basal perturbation
 % The whole center line (no sampling) tabulated along the time axis
+% (i.e., Hovemoller diagram)
 
 %% Parameters
-% (thickness change attributed to the effective pressure dependence)
-gauss_xloc = 3.2e4; % location of center of gaussian perturbation in meter
-ds = 50; % regular meshgrid spacing
+ds = 100; % regular meshgrid spacing
 geom_type = 'shallow'; % types: "deep", "shallow"
 expt_type = 'mu'; % types: "mu", "mu_plastic"
-retreat_stop_yr = 16; 
+
+% read simulation parameter table
+param_tbl = readtable('runme_param.csv');
+retreat_stop_yr = param_tbl.perturb_duration; % here the data presentation starts at the first perturbation year 
 
 %% Plot only the difference between the control and experiment 
-% specific parameter for this section
-select_md = [1];
-
 % model parameters and plot parameters
 % read in the model parameter table
 md_vars = readtable('md_var_combinations.csv');
@@ -68,11 +67,11 @@ switch geom_type
         warning('unknown depth specification!')
 end
 
-
+% start processing
 n_simu = size(folder_dir_groups{geom_i}, 1);
 ff = figure('Position',[100,100,900,1200]);
-tiledlayout(1,2,'TileSpacing','loose')
-for j = select_md
+tiledlayout(3,3,'TileSpacing','none')
+for j = 1:n_simu
     % read the model
     group = folder_dir_groups{geom_i};
     md_ctrl = load([group.folder{j},'/', group.name{j}, '/', ctrl_name]).md;
@@ -83,8 +82,8 @@ for j = select_md
     modelname = md_ctrl.miscellaneous.name;
     [W, GL, FC] = parse_modelname(modelname);
     %expt_H = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
-    expt_H = [results_tbl_expt.Surface{:}];
-    ctrl_H = [results_tbl_ctrl.Surface{:}];
+    expt_H = [results_tbl_expt.Thickness{:}];
+    ctrl_H = [results_tbl_ctrl.Thickness{:}];
     expt_H_cell = num2cell(expt_H,1); 
     ctrl_H_cell = num2cell(ctrl_H,1);
     [expt_H_grid, ~, ~] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, expt_H_cell, ds);
@@ -149,17 +148,17 @@ for j = select_md
     nexttile
     % plot control
     contourf(plot_t_expt, fliplr(plot_x), expt_H_grid_mids-ctrl_H_grid_mids, 8); % fliplr(plot_x) can be interpret as -> distance to ice front
+    hold on;
     colormap(davos); clim([-250,0]); hold on;
     plot(plot_t_expt,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
     plot(plot_t_expt,(runme_params.terminus0_x - gls_expt_c)/1000,'b-','LineWidth',2.5); hold on;    
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
     % add calving front trace
-    plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
+    plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold on
     
     if j == 1
         legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
     end
-    if length(select_md) == n_simu % full 3x3 grid, all models
         if ~ismember(j,[1,4,7])
             set(gca,'YTick',[]);
         end
@@ -168,11 +167,11 @@ for j = select_md
         else
             set(gca,'XTick',[0,4,8,12,16,20])
         end
-    else
-        xticks(0:5:20);
-        yticks(0:10:60);
-        ax = gca; ax.FontSize = 13;
-    end
+%     else
+%         xticks(0:5:20);
+%         yticks(0:10:60);
+%         ax = gca; ax.FontSize = 13;
+%     end
 
     %plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
 
@@ -182,14 +181,19 @@ cb.Layout.Tile = 'east';
 cb.TickLabels = num2cell(-250:50:0);
 cb.FontSize = 13;
 
-% if we are only plotting selected model
-if length(select_md)<n_simu; sgtitle(['Plots of ' num2str(select_md)]); end
-
 exportgraphics(gcf, ['plots/',save_foldername,'/',expt_type,'_',geom_type,'_diff.png'],'Resolution',600)
 
 
 %% Plot full simulations: H(t) from the control and experiment side-by-side
-% model parameters and plot parameters
+% Parameters
+ds = 100; % regular meshgrid spacing
+geom_type = 'deep'; % types: "deep", "shallow"
+expt_type = 'mu_plastic'; % types: "mu", "mu_plastic"
+
+% read the runme parameters
+runme_params = readtable('runme_param.csv');
+retreat_stop_yr = runme_params.perturb_duration;
+
 % read in the model parameter table
 md_vars = readtable('md_var_combinations.csv');
 Ws = sort(unique(md_vars.('fjord_width')));
@@ -200,8 +204,6 @@ foldernames = natsortfiles(dir([pwd,'/long_models_yang']));
 foldernames_tbl = struct2table(foldernames);
 bools = cellfun(@(s) ~strcmp(s(1),'.'), foldernames_tbl.name);
 foldernames_tbl = foldernames_tbl(bools,:);
-% read the runme parameters
-runme_params = readtable('runme_param.csv');
 % colormaps
 load('plots/colormap/davos.mat'); load('plots/colormap/lajolla.mat')
 lajolla = lajolla(80:end,:);
@@ -212,7 +214,7 @@ for i = 1:length(GLs)
     % skip the irrelevant ones
     GL_bool = zeros(size(foldernames_tbl,1),1);
     for j = 1:size(foldernames_tbl.name)
-        GL_bool(j) = comparee_GLvalue(foldernames_tbl.name(j), GLs(i));
+        GL_bool(j) = compare_GLvalue(foldernames_tbl.name(j), GLs(i));
     end
     % save the respective folder items to a cell
     folder_dir_groups{i} = foldernames_tbl(find(GL_bool),:); %#ok<FNDSB> 
@@ -256,8 +258,8 @@ for j = 1:n_simu
     modelname = md_ctrl.miscellaneous.name;
     [W, GL, FC] = parse_modelname(modelname);
     %expt_H = transpose(interp1(results_tbl_expt.time, [results_tbl_expt.Thickness{:}]', results_tbl_ctrl.time,'linear','extrap'));
-    expt_H = [results_tbl_expt.Surface{:}];
-    ctrl_H = [results_tbl_ctrl.Surface{:}];
+    expt_H = [results_tbl_expt.Thickness{:}];
+    ctrl_H = [results_tbl_ctrl.Thickness{:}];
     expt_H_cell = num2cell(expt_H,1); 
     ctrl_H_cell = num2cell(ctrl_H,1);
     [expt_H_grid, ~, ~] = mesh_to_grid_overtime(md_expt.mesh.elements, md_expt.mesh.x, md_expt.mesh.y, expt_H_cell, ds);
@@ -346,58 +348,4 @@ for j = 1:n_simu
     plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
     exportgraphics(gcf, ['plots/',save_foldername,'/',plot_name,'.png'],'Resolution',500)
 
-end
-
-%% OUDATED:WELL THIS IS Unfinished...(still trying to measure the wave velocity)
-% next idea is to just select a few points near the perturbation (rather
-% than throughout the whole domain right now), if we were to really measure
-% the velocity...
-locs = cell(size(ht_up,1),1);
-for i = 1:size(ht_up,1)
-    locs{i} = local_perturb_peaktime(ht_up(i,:),0:0.1:16, "up", 6, 2);
-end
-
-%% APPENDIX: Functions
-function locs = local_perturb_peaktime(data, t, rel_loc, t_crop, period)
-%LOCAL_PERTURB_PEAKTIME find the arrival time of the kinematic wave
-%initiated by the localized basal perturbation. The we find the time by
-%looking for the time where the peak in signal is observed.
-
-    if nargin < 4; t_crop = 7; period = 2; end % chop out first 7 years
-    if nargin < 5; period = 2; end
-
-    % chop the initial extra time
-    dt = mean(t(2:end) - t(1:end-1));
-    n_crop = t_crop/dt;
-    data = data(n_crop+1:end);
-    t = t(n_crop+1:end);
-    % split into multiple periods
-    % find the number of complete periods
-    n_period = period/dt;
-    num_period = floor(length(data)/n_period);
-    data = data(1:n_period*num_period);
-    t = t(1:n_period*num_period);
-    if size(data,1) ~= 1 % reshape into a row vector
-        data = data';
-    end
-    data_periods = reshape(data, n_period, num_period);
-    t_period = 0:dt:period-dt;
-    % make signal peak positive
-    switch rel_loc
-        case "up"
-            data_periods = data_periods*(-1); % invert so that max is a peak, not trough
-        case "down"
-            return
-    end
-    locs = zeros(size(data_periods,2),1);
-    for i = 1:size(data_periods, 2)
-        [pk, loc] = findpeaks(data_periods(:,i),t_period);
-        if length(loc)>1 || isempty(loc)
-            disp('Found multiple/zero peaks! Returning...')
-            return 
-        else
-            locs(i) = loc;
-        end
-    end
-    
 end
