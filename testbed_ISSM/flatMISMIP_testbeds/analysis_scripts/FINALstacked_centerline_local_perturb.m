@@ -163,7 +163,7 @@ for j = extended_idx
             clim([-10,10]);
             [~, pulse, pulse_t] = make_localized_forcing_timeseries();
         case "Pulse"
-            clim([-5,5]);
+            clim([-10,10]);
             [pulse, ~, pulse_t] = make_localized_forcing_timeseries();
         otherwise
             error('Unknown type!')
@@ -219,7 +219,7 @@ figure;
 imagesc(0*rand(10,10));clim([-5,5]);colormap(diverg_colormap(50)); colorbar
 exportgraphics(gcf,'plots/colorbar_m5_p5.png','Resolution',600)
 
-%% plot the grounding line as an inset
+%% plot the grounding line as an inset (no use? delete?)
 p = get(gca, 'Position');
 inset_y = 0.2;
 pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3) p(4)*inset_y]);

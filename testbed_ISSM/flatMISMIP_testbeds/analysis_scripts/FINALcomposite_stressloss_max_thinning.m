@@ -4,10 +4,9 @@
 % Date: June 27, 2023
 clear;clc;
 
-%% The 3rd column: plot frontal resistive stress loss vs GL and max dH 
+%% Stress balance estimation
 % first, we need to calculate the frontal resistive stress
-% This script does it for all glaciers (not just the three shown in figure
-% 7 panel C)
+% This script does it for all glaciers
 geom_type = "deep"; % options: "deep" or "shallow"
 ds = 100; % grid size for the regular grid
 sampled_ti = 1:10:240; % sampled time index
