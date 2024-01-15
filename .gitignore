@@ -1,0 +1,15 @@
+*.mat
+*.fig
+*.asv
+.DS_Store
+*.lock
+*.png
+*.queue
+*.bin
+*.outbin
+GIS/
+*.errlog
+*.outlog
+*.toolkits
+*.gif
+*.icloud
