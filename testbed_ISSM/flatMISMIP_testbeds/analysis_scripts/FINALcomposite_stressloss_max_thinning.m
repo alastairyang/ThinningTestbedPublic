@@ -258,7 +258,7 @@ axis_bot.Box = 'off';
 xlabel(axis_bot,'Grounding line retreat (km)','FontSize',15)
 axis_bot.FontSize = 14;
 set(axis_bot,'YTick',3:6)
-ylabel(axis_bot,'Total thinning (km^2)','FontSize',15)
+ylabel(axis_bot,'Centerline total thinning (km^2)','FontSize',15)
 % linear regression
 xaxis = min(gl_expt/1e3):max(gl_expt/1e3)*0.05:max(gl_expt/1e3);
 Htot_coefs = polyfit(gl_expt/1e3, dH_sum_expt/1e6,1);

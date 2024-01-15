@@ -2,6 +2,9 @@ geometry,runtime(min),step,finished time
 ,0,0,NaT
 ,0,0,NaT
 ,0,0,NaT
+domain_W5000_GL400_FC30000,87.6224106895833,13,07-Jan-2024 16:06:53
+,0,0,NaT
+domain_W11000_GL400_FC30000,180.917274525,13,07-Jan-2024 17:40:10
 ,0,0,NaT
 ,0,0,NaT
 ,0,0,NaT
@@ -14,6 +17,3 @@ geometry,runtime(min),step,finished time
 ,0,0,NaT
 ,0,0,NaT
 ,0,0,NaT
-,0,0,NaT
-,0,0,NaT
-domain_W11000_GL400_FC120000,45.0632420909667,15,20-Jul-2023 00:19:41

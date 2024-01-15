@@ -60,7 +60,7 @@ tic
 % option 2: all shallow glaciers: [1,2,3,7,8,9,13,14,15]
 % option 3: all glaciers: 1:size(mdvar_combs,1)
 % option 4: Four deep glaicer and basal drag endmembers: [4,6,16,18]
-for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number)
+for jj = [18] % Consult "mdvar_combs" for the model index (the row number)
 
     var_table = mdvar_combs(jj,:);
 
@@ -81,7 +81,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
     end
 
     % step iteration
-    for steps = 18
+    for steps = 13
 
         % Cluster parameters
         cluster = generic('name', oshostname(), 'np', 5);
@@ -1148,7 +1148,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 % and then assimilate into md.friction.C
             end
 
-            %% Ice overburden pressure change
+            % Ice overburden pressure change
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
@@ -1293,7 +1293,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             % do not interpolate forcing
             md.timestepping.interp_forcing = 0;
 
-            %% Calving
+            % Calving
             % forcings
             retreat_advance = linspace(100,retreat_rate_max, perturb_duration/2);
             retreat_slow = flip(retreat_advance);
@@ -1333,7 +1333,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 md.levelset.spclevelset(:,end+1) = [signeddistance; md.timestepping.start_time + time];
             end
             
-            %% Mass unloading
+            % Mass unloading
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
@@ -1439,7 +1439,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             % do not interpolate forcing
             md.timestepping.interp_forcing = 0;
 
-            %% Calving
+            % Calving
             % forcings
             retreat_advance = linspace(100,retreat_rate_max, perturb_duration/2);
             retreat_slow = flip(retreat_advance);
@@ -1479,7 +1479,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 md.levelset.spclevelset(:,end+1) = [signeddistance; md.timestepping.start_time + time];
             end
             
-            %% Basal perturbation with a Gaussian patch
+            % Basal perturbation with a Gaussian patch
             % add an initial time column to the friction coef vector
             C0 = md.friction.C;
             init_taub = C0.^2.*md.results.TransientSolution(end).Vel./md.constants.yts;
@@ -1655,10 +1655,10 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
 
-        if perform(org, 'Transient_MassUnloading_Extended')% {{{1 STEP 13
+        if perform(org, 'Transient_MassUnloading_Extended')% {{{1 STEP 13 extend the terminus-driving thinning run
             md = loadmodel(org, 'Transient_Calving_MassUnloading');
 
-            duration = 150; 
+            duration = 150; % year
 
             start_time = md.timestepping.final_time;
             md.timestepping = timestepping(); 
@@ -1675,7 +1675,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             % do not interpolate forcing
             md.timestepping.interp_forcing = 0;
             
-            %% Mass unloading
+            % Mass unloading
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
@@ -1705,10 +1705,13 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             md.stressbalance.requested_outputs={'default'};
 
             % time steps where we save the results
-            save_yr = 8; % save every __ years
+            awatch = tic; 
+            save_yr = 1; % save every __ years
             it_save = 1:(save_yr/dt_mu):duration/dt_mu;
-            for it = 1:duration/dt_mu            
-
+            total_iter = duration/dt_mu;
+            for it = 1:total_iter     
+                
+                bwatch = tic; % remaining time estimator watch
                 results = md.results.TransientSolution;
                 % restart and specify sim duration
                 md = transientrestart(md);
@@ -1716,15 +1719,8 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 md.timestepping.final_time = md.timestepping.start_time + dt_mu;
                 md.settings.output_frequency = dt_mu/md.timestepping.time_step;
 
-                % calculate new fric coef
-%                 if it == 1 % initial condition: delta(H) = 0
-%                     deltaH = zeros(size(md.geometry.thickness));
-%                     Hi = H0 + deltaH;
-%                     C = C1;
-%                 else
-                    deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
-                    Hi = H0 + deltaH;
-                %end
+                deltaH = results(end).Thickness - H0; % still need deltaH to mask out the first several non-perturb years
+                Hi = H0 + deltaH;
                 ocean_mask = results(end).MaskOceanLevelset;
                 C = mass_unloading(md, Hi, H0, k_budd, C0, C, ocean_mask, 1);
                 % append time and assign
@@ -1735,7 +1731,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 % solve
                 md = solve(md,'tr');
 
-                % concatenate results for every 2 years
+                % concatenate results for every 1 years
                 if ismember(it, it_save)
                     new_results = [new_results, md.results.TransientSolution(1)];
                 end
@@ -1745,6 +1741,25 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 result_tbl = struct2table(md.results.TransientSolution);
                 result_tbl = result_tbl(result_tbl.step <= 10, :);
                 md.results.TransientSolution = table2struct(result_tbl);
+
+                % remove the redundant fields in md.results
+                % (TransientSolution2, TransientSolution3...)
+                names = fieldnames(md.results);
+                results_cell = struct2cell(md.results);
+                md.results = cell2struct(results_cell(names == "TransientSolution"),...
+                    names(names == "TransientSolution"));
+                
+                % record total time and estimate the remaining time
+                timer = toc(bwatch);
+                timer2 = toc(awatch);
+                t_remain1 = (total_iter - it)*timer/60; % remaining time in meter
+                t_remain2 = timer2/it*total_iter/60;
+                t_remain = max([t_remain1,t_remain2]);
+                hr_remain = t_remain/60; % in hour
+                disp('  ---------------   ')
+                disp([' This is iteration ' num2str(it) '/' num2str(total_iter) ' ; it has run ' num2str(timer2/3600) ' hr.'])
+                disp([' This is model number ' num2str(jj)])
+                disp('  ---------------   ')
             end
 
             md.results = [];
@@ -1762,7 +1777,8 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             disp(['    Elapsed time is ' num2str(runTime/60) ' minutes, or ' num2str(runTime/3600) ' hours'])
         end
 
-        if perform(org, 'Transient_LocalPerturb_Pulse_Extended')% {{{1 STEP 14
+        if perform(org, 'Transient_LocalPerturb_Pulse_Extended')% {{{1 STEP 14: Extend the pulse perturbation run
+            % 
             md = loadmodel(org, pulse_gauss_mu_title);
 
             if ismember(jj,13:18) % high basal drag testbeds takes longer to equilibrate
@@ -1782,11 +1798,10 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
             cluster = generic('name', oshostname(), 'np', np);
             md.cluster = cluster;
             % relax max iteration
-            md.stressbalance.maxiter=100;
+            md.stressbalance.maxiter=60;
             % do not interpolate forcing
             md.timestepping.interp_forcing = 0;
             
-            %% Mass unloading
             % save previous fields separately
             % this step help re-assembles all results later easily
             md_temp = transientrestart(md);
@@ -2101,13 +2116,15 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
         end
 
         if perform(org, [pulse_gauss_mu_title '_Extended'])% {{{1 STEP 17: Basal perturbation: pulse gaussian patch + mass unloading
+            % this is one single extended run that starts at the beginning
+            % of the perbutation
             md = loadmodel(org, 'Transient_ExtraInfo');
             md.stressbalance.requested_outputs={};
             md.transient.requested_outputs = {'Thickness'};
 
             % extended time
             if ismember(jj,13:18) % high basal drag testbeds takes longer to equilibrate
-                time_add = 250;
+                time_add = 150;
             else
                 time_add = 80;
             end
@@ -2230,7 +2247,7 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
                 delta_C_all(:,iter) = delta_C; % delta_C: reduction is positive
                 % this delta_C_all is then modified below 
                 % when we calculate the effective pressure change
-                % and then assimilate into md.friction.C
+                % and then added into md.friction.C
             end
 
             % Ice overburden pressure change
@@ -2378,13 +2395,15 @@ for jj = [4,6,16,18] % Consult "mdvar_combs" for the model index (the row number
         end
 
         if perform(org, [diffu_gauss_mu_title '_Extended'])% {{{1 STEP 18: Basal perturbation: diffused pulse gaussian patch + mass unloading
+            % this is one single extended run that starts at the beginning
+            % of the perbutatioin
             md = loadmodel(org, 'Transient_ExtraInfo');
             md.stressbalance.requested_outputs={};
             md.transient.requested_outputs = {'Thickness'};
 
             % extended time
             if ismember(jj,13:18) % high basal drag testbeds takes longer to equilibrate
-                time_add = 250;
+                time_add = 150;
             else
                 time_add = 80;
             end

@@ -4,7 +4,7 @@
 
 %% Parameters
 ds = 100; % regular meshgrid spacing
-geom_type = 'shallow'; % types: "deep", "shallow"
+geom_type = 'deep'; % types: "deep", "shallow"
 expt_type = 'mu'; % types: "mu", "mu_plastic"
 
 % read simulation parameter table
@@ -12,6 +12,8 @@ param_tbl = readtable('runme_param.csv');
 retreat_stop_yr = param_tbl.perturb_duration; % here the data presentation starts at the first perturbation year 
 
 %% Plot only the difference between the control and experiment 
+% This generate figure 11
+
 % model parameters and plot parameters
 % read in the model parameter table
 md_vars = readtable('md_var_combinations.csv');
@@ -69,7 +71,7 @@ end
 
 % start processing
 n_simu = size(folder_dir_groups{geom_i}, 1);
-ff = figure('Position',[100,100,900,1200]);
+ff = figure('Position',[100,100,400,1200]);
 tiledlayout(3,3,'TileSpacing','none')
 for j = 1:n_simu
     % read the model
@@ -150,30 +152,29 @@ for j = 1:n_simu
     contourf(plot_t_expt, fliplr(plot_x), expt_H_grid_mids-ctrl_H_grid_mids, 8); % fliplr(plot_x) can be interpret as -> distance to ice front
     hold on;
     colormap(davos); clim([-250,0]); hold on;
-    plot(plot_t_expt,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
+%    plot(plot_t_expt,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
     plot(plot_t_expt,(runme_params.terminus0_x - gls_expt_c)/1000,'b-','LineWidth',2.5); hold on;    
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
     % add calving front trace
     plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold on
-    
-    if j == 1
-        legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
-    end
-        if ~ismember(j,[1,4,7])
-            set(gca,'YTick',[]);
-        end
-        if ~ismember(j,[7,8,9])
-            set(gca,'XTick',[])
-        else
-            set(gca,'XTick',[0,4,8,12,16,20])
-        end
-%     else
-%         xticks(0:5:20);
-%         yticks(0:10:60);
-%         ax = gca; ax.FontSize = 13;
-%     end
 
-    %plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
+    %     if j == 1
+    %         legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
+    %     end
+    if ~ismember(j,[1,4,7])
+        set(gca,'YTick',[]);
+        set(gca,'FontSize',15)
+    else
+        set(gca,'YTick',0:20:50)
+        set(gca,'FontSize',15)
+    end
+    if ~ismember(j,[7,8,9])
+        set(gca,'XTick',[])
+        set(gca,'FontSize',15)
+    else
+        set(gca,'XTick',4:4:21)
+        set(gca,'FontSize',15)
+    end
 
 end
 cb = colorbar;
@@ -327,6 +328,8 @@ for j = 1:n_simu
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
     % add calving front trace
     plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
+    set(gca,'XTick',0:4:21)
+    set(gca,'FontSize',15)
     
     % plot experiment
     nexttile
@@ -336,14 +339,13 @@ for j = 1:n_simu
     colorbar
     hold on
     % add grounding line
-    plot(plot_t_ctrl,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
+%    plot(plot_t_ctrl,(runme_params.terminus0_x - gls_ctrl_c)/1000,'r-','LineWidth',2.5); hold on;
     plot(plot_t_expt,(runme_params.terminus0_x - gls_expt_c)/1000,'b-','LineWidth',2.5); hold on;
     xline(retreat_stop_yr,'k:','LineWidth',2); hold on
     % add calving front trace
     plot(plot_t_ctrl, (runme_params.terminus0_x -cfs_c)/1000, 'k-.','LineWidth',1); hold off
-    if j == 1
-        legend({'','Control GL','Experiment GL','Retreat stops'},'FontSize',15)
-    end
+    set(gca,'XTick',4:4:21)
+    set(gca,'FontSize',15)
 
     plot_name = [md_ctrl.miscellaneous.name(9:end),'_',geom_type];
     exportgraphics(gcf, ['plots/',save_foldername,'/',plot_name,'.png'],'Resolution',500)

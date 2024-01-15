@@ -6,7 +6,7 @@ clear; clc;
 %% Parameters
 ds = 50; % structured meshgrid spacing
 pulse_type = 'Pulse'; % options: "Diffu","Pulse"
-geom_type = 'deep'; % options: "deep", "shallow"
+geom_type = 'shallow'; % options: "deep", "shallow"
 expt_type = 'mu'; % options: "no_mu", "mu" (without ice overburden pressure feedback; with ~. In our text, we account for the feedback by default)
 
 %% Read in model parameters
@@ -57,12 +57,13 @@ switch expt_type
     case 'mu'
         ctrl_name = 'MISMIP_yangTransient_Calving_MassUnloading.mat';
         expt_name = ['MISMIP_yangTransient_Calving_MassUnloading_',pulse_type,'GaussianPerturb_8.mat'];
-        ctrl_extend_name = 'MISMIP_yangTransient_MassUnloading_Extended.mat';
-        expt_extend_name = ['MISMIP_yangTransient_LocalPerturb_',pulse_type,'_Extended.mat'];
+%         ctrl_extend_name = 'MISMIP_yangTransient_MassUnloading_Extended.mat';
+%         expt_extend_name = ['MISMIP_yangTransient_LocalPerturb_',pulse_type,'_Extended.mat'];
     otherwise
         error('Unknown experiment type!')
 end
 
+% select the geometry group of our interest
 group = folder_dir_groups{geom_i};
 
 %% Loading the models and processing
@@ -112,7 +113,7 @@ for j = extended_idx
     mid_y = floor(size(md_grid,1)/2);
     md_grid_mids = squeeze(md_grid(mid_y,:,:));
     % crop grounding line vector as well
-    gls_expt_c = gls_expt(start_t/dt+1:end);
+    gls_expt_c = gls_expt_interp(start_t/dt+1:end);
     front_c = front(start_t/dt+1:end);
     gls_diff_c = gls_diff(start_t/dt+1:end);
 
@@ -121,20 +122,6 @@ for j = extended_idx
     plot_x = x(x<=runme_params.terminus0_x)/1000; % in km
     fake_t_end = 26;
     nt = floor((fake_t_end-plot_t(end))*size(md_grid_mids,2)/plot_t(end));
-    % get extended data
-    if ismember(j, extended_idx)
-        md_ctrl_extend = load([group.folder{j},'/', group.name{j}, '/', ctrl_extend_name]).md;
-        md_expt_extend = load([group.folder{j},'/', group.name{j}, '/', expt_extend_name]).md;
-        [rel_GL_extend, front_extend, dH_extend, t_extend, ~, ~, gls_expt_extend] = checkNewSS(md_ctrl_extend, md_expt_extend, ds, nt);
-        % concatenate to the main data array
-        fake_t_extend = linspace(plot_t(end),fake_t_end,length(t_extend));
-        fake_t_extend = fake_t_extend(2:end);
-        plot_t = [plot_t, fake_t_extend];
-        gls_diff_c = [gls_diff_c; rel_GL_extend(2:end)];
-        gls_expt_c = [gls_expt_c; gls_expt_extend(2:end)];
-        front_c = [front_c; front_extend(2:end)];
-        md_grid_mids = [md_grid_mids, dH_extend(x<=runme_params.terminus0_x,:)];
-    end
         
     % Create the figure (one for each glacier; save all in a folder)
     figure('Position',[100,100,700,600]);
@@ -148,14 +135,14 @@ for j = extended_idx
     plot(plot_t, front_c/1000, '-.k','LineWidth',1.2); hold on
     % add the end-of-perturbation dashline
     xline(16,':k','LineWidth',1.2); hold on
-    xline(last_t,':k','LineWidth',2.4); hold off
     ax = gca; ax.FontSize = 18;
-    xticks_p1 = 0:2:21; xticks_p2 = 22:2:fake_t_end;
-    xticks = [xticks_p1, xticks_p2];
-    fake_t_extend_labels = floor(interp1(fake_t_extend, t_extend(2:end), xticks_p2));
-    TickLabels = [string(xticks_p1) string(fake_t_extend_labels)];
-    set(gca,'XTick',xticks); set(gca,'XTickLabel',TickLabels)
+
     xtickangle(45)
+    xticks = 0:2:21;
+    xlim([min(xticks), max(xticks)])
+    set(gca,'XTick',xticks);
+    set(gca,'XTickLabel',string(xticks))
+    xlabel('Time (yr)','FontSize',18)
     
     % add pulse timeseries plot
     switch pulse_type
@@ -163,7 +150,7 @@ for j = extended_idx
             clim([-10,10]);
             [~, pulse, pulse_t] = make_localized_forcing_timeseries();
         case "Pulse"
-            clim([-10,10]);
+            clim([-5,5]);
             [pulse, ~, pulse_t] = make_localized_forcing_timeseries();
         otherwise
             error('Unknown type!')
@@ -173,20 +160,18 @@ for j = extended_idx
     % plot the grounding line as an inset
     p = get(gca, 'Position');
     inset_y = 0.2;
-    pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3) p(4)*inset_y*0.87]);
+    pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3) p(4)*inset_y*0.94]);
     %plot_gl_t = t_ctrl - t_ctrl(1);
     yyaxis left
     % ...as an anomaly plot
     %anomaly(plot_gl_t(start_t/dt+1:end)-plot_gl_t(start_t/dt+1), gls_diff_c)
     anomaly(plot_t, gls_diff_c);
-    set(gca,'XTick',xticks)
-    set(gca,'XTickLabel',TickLabels)
     xtickangle(45)
     hold on;
     set(gca, 'YDir','reverse')
-    xlim([0,xticks(end)])
-    ylabel('GL(m)','FontSize',18)
-    xlabel('Time (yr)','FontSize',16)
+    set(gca,'XTick',xticks);
+    xlim([0, max(xticks)])
+    ylabel('$\Delta$ \textsf{GL(m)}','FontSize',18,'Interpreter','latex')
     % add pulse
     yyaxis right
     dtt = 0.01;
@@ -197,10 +182,10 @@ for j = extended_idx
     set(gca,'Ytick',[])
     ax = gca;
     ax.YAxis(1).Color = 'k'; 
+    ax.YAxis(2).Color = 'k';
     ax.FontSize = 18;
     % add the end-of-perturbation dashline
     xline(16,':k','LineWidth',1.2); hold on
-    xline(last_t,':k','LineWidth',2.4); hold off
    
     % export 
     plot_name = [md_ctrl.miscellaneous.name(9:end),'_',pulse_type,'_',geom_type,'_',expt_type];
@@ -218,29 +203,3 @@ exportgraphics(gcf,'plots/colorbar_m10_p10.png','Resolution',600)
 figure;
 imagesc(0*rand(10,10));clim([-5,5]);colormap(diverg_colormap(50)); colorbar
 exportgraphics(gcf,'plots/colorbar_m5_p5.png','Resolution',600)
-
-%% plot the grounding line as an inset (no use? delete?)
-p = get(gca, 'Position');
-inset_y = 0.2;
-pp = axes('Parent', gcf, 'Position', [p(1) p(4)*(1-inset_y)+p(1) p(3) p(4)*inset_y]);
-plot_gl_t = t_ctrl - t_ctrl(1);
-yyaxis left
-% ...as an anomaly plot
-anomaly(plot_gl_t(start_t/dt+1:end)-plot_gl_t(start_t/dt+1), gls_diff(start_t/dt+1:end))
-hold on;
-set(gca, 'YDir','reverse')
-xlim([0, end_t-5]); ylabel('GL(m)','FontName','Aria','FontSize',18)
-xlabel('Time (yr)','FontName','Aria')
-% add pulse
-yyaxis right
-dtt = 0.01;
-pulse_t = pulse_t(start_t/dtt+1:end) - pulse_t(start_t/dtt+1);
-pulse = pulse(start_t/dtt+1:end);
-plot(pulse_t, pulse,'k','LineWidth',2);
-switch pulse_type; case "Diffu"; ylim([0,0.2]); case "Pulse"; ylim([0,1]);otherwise; error('Unknown type');end
-set(gca,'Ytick',[])
-ax = gca;
-ax.YAxis(1).Color = 'k';
-ax.FontSize = 18;
-% add the end-of-perturbation dashline
-xline(16,':k','LineWidth',1.2); hold off

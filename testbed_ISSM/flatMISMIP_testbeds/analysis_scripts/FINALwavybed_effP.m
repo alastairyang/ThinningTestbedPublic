@@ -3,7 +3,7 @@
 % Author: Donglai Yang
 % Date: June 27, 2023
 clear; clc;
-%% Load model data, "md"
+% Load model data, "md"
 load('wavybed_models_yang/model_W5000_GL400_FC120000/MISMIP_yangTransient_Calving_MassUnloading.mat')
 
 %% Extract data
@@ -102,38 +102,73 @@ stt = diff(thalweg_sample_st,1,1);
 % figure; plot(htt) 
 % figure; plot(thalweg_sample_ht)
 
-%% Load wavy bed data
+% Load wavy bed data
 wavybed = load('random_beds/dD80_H07_RO4000_3_grid.mat').wavybed;
 
-%% plot the glacier lateral profile evolution
+% plot the glacier lateral profile evolution
+% shift data to the start of perturbation
+idx = time>5;
+plot_t = time(idx)-5;
+
+thalweg_sample_ht_c = thalweg_sample_ht(idx);
+front_locs = front_locs(1:end-1); front_locs = front_locs(idx);
+gl_locs = gl_locs(1:end-1); gl_locs = gl_locs(idx);
+
 % load colormap
 cp = load('plots/colormap/lajolla.mat').lajolla;
+cp_modi = [cp'*255; ones(1,size(cp,1))];
+cp_modi_interp = transpose(uint8(interp1(1:256, cp_modi', (size(cp,1)/length(plot_t))*(1:length(plot_t)))));
+brown = [228, 119, 41]/255;
 
+% highlight times of stepwise retreat with circular markers
+t_start = 6.5;
+t_end = 12.5;
+t_mark = t_start:0.05:t_end;
+gl_mark = interp1(plot_t, gl_locs/1000, t_mark);
+
+%% make plots
 figure('Position',[100,100,800,500])
+plot_t_max = 16; % only plot the first 16 years (full perturbation; no relaxation plotted)
+plot_idx = plot_t<plot_t_max;
 % thickness change timeseries
 tiledlayout(2,1,'TileSpacing','tight')
 nexttile
 yyaxis left;
-plot(ht_data.t(1:end), thalweg_sample_ht,'-b','LineWidth',1.5);colororder(cool(sample_number)); hold on;
+p1 = plot(plot_t(plot_idx), thalweg_sample_ht_c(plot_idx),'-k','LineWidth',1.5);hold on;
+%colororder(cool(sample_number)); 
 ylabel('Meter','FontSize',13)
+set(gca,'ycolor','k')
 hold on;
+
 yyaxis right;
 % plot front and grounding line location
-plot(ht_data.t(1:end-1), front_locs(1:258)/1000,'-.r','LineWidth',1.5);hold on;
-plot(ht_data.t(1:end-1),gl_locs(1:258)/1000,'-.b','LineWidth',1.5)
-legend(["H(t)","Front","Grounding Line"],'FontSize',13,'Location','southwest')
-set(gca,'ycolor','r')
+p2 = plot(plot_t(plot_idx), front_locs(plot_idx)/1000,'-.','LineWidth',1.5,'Color',brown);hold on;
+p3 = plot(plot_t(plot_idx), gl_locs(plot_idx)/1000,'-.k','LineWidth',1.5);
+hold on; 
+%legend(["Thickness","Front","Grounding Line"],'FontSize',13,'Location','southwest')
+%legend([p1,p2,p3],'Thickness','Front','Grounding Line','FontSize',13,'Location','southwest')
+set(gca,'ycolor',brown)
 ylabel('Kilometer','FontSize',13)
-xlabel('Year','FontSize',13)
-xlim([0,26])
+xlabel('Year since perturbation starts','FontSize',13)
+xlim([0,plot_t_max])
 
 % plot profile evolution
 nexttile
-[x_plot, bed_plot,~,~,colors_plot] = plot_all_profiles(md,10,cp); hold on;
+[x_plot, bed_plot,~,~,colors_plot,t] = plot_all_profiles(md,10,cp); hold on;
 % add a dashed line at where the timeseries is taken
 xline(sample_x/1000,':k','LineWidth',2)
 xlabel('Along flow direction (km)','FontSize',13);
 ylabel('Elevation (m)','FontSize',13);
+% add markers
+c_markers = interp1(t, colors_plot, t_mark);
+gl_at_base = interp1(x_plot/1e3, bed_plot, gl_mark);
+scatter(gl_mark, gl_at_base, 70, c_markers,"filled",'MarkerEdgeColor','k','MarkerEdgeAlpha',0.02); 
+
+% back to the first subplot and add markers
+nexttile(1)
+yyaxis right
+scatter(t_mark, gl_mark, 70, c_markers,'filled','MarkerFaceAlpha',0.8,'MarkerEdgeColor','k','MarkerEdgeAlpha',0.02)
+legend([p1,p2,p3],'Thickness','Front','Grounding Line','FontSize',13,'Location','southwest')
 
 exportgraphics(gcf, 'plots/wavybed_gl_retreat_line.png','Resolution',600)
 
@@ -148,7 +183,7 @@ cb_p.Ticks = [0,floor(val_max/2),val_max];
 cb_p.TickLabels = string(cb_p.Ticks);
 cb_p.FontSize = 14;
 cb_p.Location = 'northoutside';
-exportgraphics(gcf,'plots/wavy_colorbar.pdf','ContentType','vector')
+%exportgraphics(gcf,'plots/wavy_colorbar.pdf','ContentType','vector')
 %% Map view of bed topography and thinning rate
 % crop the plan view extent (zoom in)
 % start by specifying x and y limits of the cropped data
@@ -197,7 +232,7 @@ xticks([35,40,45])
 exportgraphics(gcf, 'plots/wavybed_gl_retreat_map.png','Resolution',600)
 
 %% functions
-function [x,bed_profile, surface_profiles, base_profiles, colors_p] = plot_all_profiles(md, skip, colormap_p)
+function [x,bed_profile, surface_profiles, base_profiles, colors_p, t_sample] = plot_all_profiles(md, skip, colormap_p)
 %PLOT_ALL_PROFILES
 %   Plot the lateral profiles of the glaciers at specified time steps
 %
@@ -214,6 +249,8 @@ function [x,bed_profile, surface_profiles, base_profiles, colors_p] = plot_all_p
 
     if nargin == 1; skip = 1; end
     nt = size(md.results.TransientSolution,2);
+    t = [md.results.TransientSolution(:).time];
+    t = t-t(1);
     warning_id = 'MATLAB:handle_graphics:exceptions:SceneNode';
     warning('off',warning_id)
 
@@ -229,7 +266,7 @@ function [x,bed_profile, surface_profiles, base_profiles, colors_p] = plot_all_p
         % create color order from colormap
         n_c = length(1:skip:nt);
         colors_p = colormap_to_colororder(colormap_p, n_c,1,100);
-        colors_p = repelem(colors_p, 2*ones(n_c,1), 1);
+        colors_p2 = repelem(colors_p, 2*ones(n_c,1), 1);
     end
     % bedrock color
     rock_rgb = [204, 204, 204]/255;
@@ -257,8 +294,12 @@ function [x,bed_profile, surface_profiles, base_profiles, colors_p] = plot_all_p
     surface_profiles = [];
     base_profiles = [];
 
+    % sample some time slices
+    t_sample_idx = 1:skip:nt;
+    t_sample = t(t_sample_idx);
+
     % plot bed profile first
-    for i = 1:skip:nt
+    for i = t_sample_idx
         % mesh to grid
         surface = InterpFromMeshToGrid(md.mesh.elements, md.mesh.x, md.mesh.y,...
             md.results.TransientSolution(i).Surface,...
@@ -277,7 +318,7 @@ function [x,bed_profile, surface_profiles, base_profiles, colors_p] = plot_all_p
         ylim([basevalue,1500])
     end
     plot(x/1000, bed_profile, 'black');hold on;
-    colororder(colors_p)
+    colororder(colors_p2)
     % color the bedrock
     a = area(x/1000, bed_profile, basevalue); hold off
     a.FaceColor = rock_rgb; a.EdgeColor = rock_rgb;

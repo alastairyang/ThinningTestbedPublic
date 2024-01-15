@@ -72,6 +72,8 @@ ylabel('Distance to front (km)','FontSize',18)
 % add grounding line and calving front
 plot(plot_t, gls_expt_c/1000,'-k','LineWidth',1.2); hold on
 plot(plot_t, front_c/1000, '-.k','LineWidth',1.2); hold on
+xticks = 0:2:21;
+set(gca,'XTick',xticks)
 % add the end-of-perturbation dashline
 xline(16,':k','LineWidth',1.2); hold off
 ax = gca;
@@ -101,8 +103,11 @@ anomaly(plot_gl_t(start_t/dt+1:end)-plot_gl_t(start_t/dt+1), gls_diff(start_t/dt
 ylim([-50,5])
 hold on;
 set(gca, 'YDir','reverse')
-xlim([0, end_t-5]); ylabel('GL(m)','FontName','Aria','FontSize',18)
+xlim([0, end_t-5]); 
+ylabel('$\Delta$ \textsf{GL(m)}','FontSize',18,'Interpreter','latex')
 xlabel('Time (yr)','FontName','Aria')
+set(gca,'XTick',xticks)
+
 
 % add pulse
 yyaxis right
