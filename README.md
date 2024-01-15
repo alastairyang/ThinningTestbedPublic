@@ -1,6 +1,8 @@
 # Code repo for *Characteristics of dynamic thickness change across diverse outlet glacier geometries and basal conditions*
 
-Author: Donglai Yang
+Paper Authors: Donglai Yang, Kristin Poinar, Sophie Nowicki, Beata Csatho
+
+Repo author: Donglai Yang
 
 Contact: donglaiy@buffalo.edu or dyang379@gatech.edu
 
