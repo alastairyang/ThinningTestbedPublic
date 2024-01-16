@@ -35,6 +35,8 @@ Once simulation data is made available, you can put all testbed output (folders 
 
 `runme_free_front_long.m`: main file, containing all experiments for all testbeds.
 
+> Note that in this file, the overburden experiment (Fig.2B in the paper) is called "mass unloading".
+
 `runme_wavybed.m`: file for running rough bed experiment (Fig. 2D in the paper).
 
 `rumme_param.csv`: parameter files essential for model running (i.e., `runme_free_front_long.m`).
@@ -53,7 +55,7 @@ Once simulation data is made available, you can put all testbed output (folders 
 
 
 ## Run analysis scripts
-To run analysis scripts, set the working directory `flatMISMIP_testbeds'. Inside the folder, each script is named such that it clearly identifies which figure it reproduces. Note that many figures in the paper used Inkscape to arrange subplots, legends, annotations, and other graphical features, so these scripts do not precisely recreate the figures, but the essential data plots are made.
+To run analysis scripts, set the working directory `flatMISMIP_testbeds'. Inside the folder, each script is named such that it clearly identifies which figure it reproduces. Note that many figures in the paper used Inkscape to arrange subplots, legends, annotations, and other graphical features, so these scripts do not precisely recreate the figures; they merely plot the essential data.
 
 ## Questions
 Please contact Donglai Yang for clarification about the scripts.
