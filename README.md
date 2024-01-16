@@ -53,7 +53,7 @@ Once simulation data is made available, you can put all testbed output (folders 
 
 
 ## Run analysis scripts
-To run analysis scripts, set the working directory `flatMISMIP_testbeds'. 
+To run analysis scripts, set the working directory `flatMISMIP_testbeds'. Inside the folder, each script is named such that it clearly identifies which figure it reproduces. Note that many figures in the paper used Inkscape to arrange subplots, legends, annotations, and other graphical features, so these scripts do not precisely recreate the figures, but the essential data plots are made.
 
 ## Questions
 Please contact Donglai Yang for clarification about the scripts.
