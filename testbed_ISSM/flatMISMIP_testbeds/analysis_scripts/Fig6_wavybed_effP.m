@@ -1,5 +1,5 @@
 %% Analysis of effective pressure experiment at a wavy/rough bed
-% This script creates figure 5 in the main text
+% This script creates figure 6 in the main text
 % Author: Donglai Yang
 % Date: June 27, 2023
 clear; clc;

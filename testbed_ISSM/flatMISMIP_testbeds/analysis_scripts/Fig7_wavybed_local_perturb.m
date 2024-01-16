@@ -1,5 +1,5 @@
 %% Analyze the localized basal perturbation at an underdeepening section of a fractal rough bed
-% This creates figure 6 in the main text
+% This creates figure 7 in the main text
 % Date: June 28, 2023
 % Author: Donglai Yang
 
