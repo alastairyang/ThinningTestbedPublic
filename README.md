@@ -1,10 +1,8 @@
 # Code repo for *Characteristics of dynamic thickness change across diverse outlet glacier geometries and basal conditions*
 
-Paper Authors: Donglai Yang, Kristin Poinar, Sophie Nowicki, Beata Csatho
+Paper authors: Donglai Yang, Kristin Poinar, Sophie Nowicki, Beata Csatho
 
 Repo author: Donglai Yang
-
-Contact: donglaiy@buffalo.edu or dyang379@gatech.edu
 
 ## Overview
 This repository contains scripts to create [ISSM](https://issm.jpl.nasa.gov) model that generate the testbeds (Fig. 1 in the paper) and run the experiments (Fig. 2 in the paper). This repo does not contain the simulation data. The simulation data will be made available prior to publication.
@@ -55,5 +53,7 @@ Once simulation data is made available, you can put all testbed output (folders 
 
 
 ## Run analysis scripts
----
-To run analysis scripts
+To run analysis scripts, set the working directory `flatMISMIP_testbeds'. 
+
+## Questions
+Please contact Donglai Yang for clarification about the scripts.
