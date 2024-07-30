@@ -64,7 +64,7 @@ function plot_output2D(md, var, varargin)
 
             % velocity change
         elseif strcmp('dudt', var)
-            climits = 50;
+            climits = 200;
             if length(varargin) == 1
                 threshold = varargin{1};
             else
